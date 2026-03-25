@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Vice Districts: Character Build</title>
+  <style>
+    :root{
+      --bg:#12051f;
+      --bg2:#090212;
+      --text:#ffeefc;
+      --muted:#d4a8cf;
+      --hot:#ff4db8;
+      --cyan:#5ef2ff;
+      --lime:#b9ff66;
+      --warn:#ffd166;
+      --danger:#ff5d73;
+      --good:#79ffb0;
+      --shadow:rgba(0,0,0,.35);
+      --bottom-pad:calc(124px + env(safe-area-inset-bottom,0px));
+    }
+
+    *{box-sizing:border-box}
+
+    html,body{
+      margin:0;
+      padding:0;
+      min-height:100%;
+      background:
+        radial-gradient(circle at top right,rgba(255,77,184,.18),transparent 30%),
+        radial-gradient(circle at bottom left,rgba(94,242,255,.12),transparent 28%),
+        linear-gradient(180deg,var(--bg2),var(--bg));
+      color:var(--text);
+      font-family:Consolas,Monaco,"Courier New",monospace;
+    }
+
+    body{padding-bottom:var(--bottom-pad)}
+
+    .wrap{
+      max-width:1460px;
+      margin:0 auto;
+      padding:12px;
+      display:grid;
+      grid-template-columns:300px minmax(0,1fr) 300px;
+      gap:12px;
+    }
+
+    .panel,.hero,.dock,.modal-box,.ticker{
+      background:linear-gradient(180deg,rgba(42,18,66,.98),rgba(20,8,34,.98));
+      border:1px solid rgba(127,60,183,.95);
+      border-radius:18px;
+      box-shadow:0 10px 28px var(--shadow);
+    }
+
+    .panel-header{
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background:linear-gradient(90deg,rgba(255,77,184,.14),rgba(94,242,255,.08));
+    }
+
+    .panel-header h2{
+      margin:0;
+      font-size:14px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+    .panel-body{padding:12px 14px}
+
+    .hero{
+      padding:16px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .hero::before{
+      content:"";
+      position:absolute;
+      inset:-40% auto auto -10%;
+      width:130%;
+      height:220px;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);
+      transform:rotate(-8deg);
+      animation:shine 7s linear infinite;
+    }
+
+    .title{
+      position:relative;
+      z-index:1;
+      font-size:31px;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      text-shadow:0 0 18px rgba(255,77,184,.35);
+    }
+
+    .subtitle{
+      position:relative;
+      z-index:1;
+      color:var(--muted);
+      margin-top:6px;
+      line-height:1.45;
+    }
+
+    .ticker{
+      margin-top:10px;
+      padding:8px 12px;
+      display:flex;
+      gap:12px;
+      align-items:center;
+      overflow:hidden;
+    }
+
+    .ticker-label{
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      color:var(--cyan);
+      font-weight:800;
+      flex:0 0 auto;
+    }
+
+    .ticker-text{
+      white-space:nowrap;
+      animation:ticker 18s linear infinite;
+      color:var(--muted);
+    }
+
+    .main{
+      display:grid;
+      grid-template-rows:auto auto auto minmax(280px,1fr);
+      gap:12px;
+      min-height:calc(100vh - 24px);
+    }
+
+    .stats-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+
+    .stat,.mini-card,.district-card,.tab-btn{
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:14px;
+    }
+
+    .stat,.mini-card{padding:10px}
+
+    .label{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .value{
+      font-size:18px;
+      font-weight:800;
+      margin-top:3px;
+    }
+
+    .tiny{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .hot{color:var(--hot)}
+    .cyan{color:var(--cyan)}
+    .lime{color:var(--lime)}
+    .warn{color:var(--warn)}
+    .danger{color:var(--danger)}
+    .good{color:var(--good)}
+
+    .meter{
+      width:100%;
+      height:10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.08);
+      overflow:hidden;
+      margin-top:6px;
+    }
+
+    .fill{
+      height:100%;
+      background:linear-gradient(90deg,var(--hot),var(--cyan));
+      width:0;
+      transition:width .25s ease;
+    }
+
+    .wanted-stars{
+      letter-spacing:.18em;
+      font-size:18px;
+      font-weight:900;
+      animation:heatPulse 1.4s ease-in-out infinite;
+    }
+
+    .cityline{
+      display:grid;
+      grid-template-columns:repeat(5,1fr);
+      gap:10px;
+    }
+
+    .district-card{
+      padding:10px;
+      min-height:104px;
+      opacity:.72;
+      transition:transform .18s ease,opacity .18s ease;
+    }
+
+    .district-card.current{
+      outline:2px solid var(--cyan);
+      opacity:1;
+      transform:translateY(-2px);
+    }
+
+    .district-card.unlocked{opacity:1}
+    .district-card.locked{filter:grayscale(.4)}
+
+    .district-name{
+      font-weight:800;
+      margin-bottom:6px;
+    }
+
+    .district-meta{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.34;
+    }
+
+    .surface{
+      padding:12px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.08);
+      background:linear-gradient(180deg,rgba(8,2,14,.92),rgba(22,8,34,.92));
+    }
+
+    #log{
+      min-height:240px;
+      max-height:44vh;
+      overflow:auto;
+      padding-right:4px;
+    }
+
+    .entry{
+      padding:10px 0;
+      border-bottom:1px dashed rgba(255,255,255,.08);
+      animation:fadeIn .2s ease;
+    }
+
+    .entry:last-child{border-bottom:none}
+
+    .dock{
+      position:fixed;
+      left:10px;
+      right:10px;
+      bottom:calc(10px + env(safe-area-inset-bottom,0px));
+      z-index:30;
+      padding:10px;
+    }
+
+    .dock-head{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      margin-bottom:10px;
+    }
+
+    .dock-title{
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      color:var(--muted);
+      font-weight:800;
+    }
+
+    .quick-status{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .action-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+      gap:8px;
+    }
+
+    button{
+      width:100%;
+      border:none;
+      border-radius:12px;
+      padding:12px 10px;
+      background:linear-gradient(180deg,#ff4db8,#b62a7d);
+      color:#fff;
+      font-weight:800;
+      letter-spacing:.03em;
+      cursor:pointer;
+      box-shadow:0 8px 18px rgba(255,77,184,.22);
+    }
+
+    button.secondary{background:linear-gradient(180deg,#5ef2ff,#258eac)}
+    button.good{background:linear-gradient(180deg,#79ffb0,#2d9f61)}
+    button.warn{background:linear-gradient(180deg,#ffd166,#c08a18)}
+    button.dark{background:linear-gradient(180deg,#56316f,#2a1638);box-shadow:none}
+    button:active{transform:scale(.985)}
+
+    .small-controls{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      margin-top:10px;
+    }
+
+    .chip{
+      display:inline-block;
+      padding:5px 8px;
+      border-radius:999px;
+      background:rgba(255,255,255,.08);
+      font-size:12px;
+      margin:2px 4px 2px 0;
+    }
+
+    .list{display:grid;gap:8px}
+
+    .tabs{
+      display:none;
+      grid-template-columns:repeat(4,1fr);
+      gap:8px;
+    }
+
+    .tab-btn{
+      padding:10px 8px;
+      color:var(--text);
+      font-weight:800;
+    }
+
+    .tab-btn.active{
+      outline:2px solid var(--cyan);
+      background:rgba(94,242,255,.09);
+    }
+
+    .mobile-pane{display:block}
+    .hide-mobile{display:block}
+    .show-mobile{display:none}
+
+    .toast{
+      position:fixed;
+      top:12px;
+      left:50%;
+      transform:translateX(-50%) translateY(-16px);
+      background:rgba(8,2,14,.94);
+      border:1px solid rgba(94,242,255,.45);
+      padding:10px 14px;
+      border-radius:999px;
+      color:var(--text);
+      z-index:60;
+      opacity:0;
+      transition:opacity .25s ease,transform .25s ease;
+      box-shadow:0 10px 22px rgba(0,0,0,.35);
+      pointer-events:none;
+    }
+
+    .toast.show{
+      opacity:1;
+      transform:translateX(-50%) translateY(0);
+    }
+
+    .chase-strip{
+      height:26px;
+      position:relative;
+      overflow:hidden;
+      border-radius:999px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.06);
+      margin-top:10px;
+    }
+
+    .car{
+      position:absolute;
+      left:-50px;
+      top:3px;
+      font-size:18px;
+    }
+
+    .car.run{animation:driveAcross 2.2s linear}
+
+    .portrait-wrap{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+    }
+
+    .portrait{
+      width:96px;
+      height:96px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      object-fit:cover;
+      box-shadow:0 0 24px rgba(255,77,184,.18);
+    }
+
+    .contact-card{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      padding:10px;
+      border-radius:12px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.06);
+      margin-bottom:8px;
+    }
+
+    .contact-thumb{
+      width:42px;
+      height:42px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.1);
+      object-fit:cover;
+    }
+
+    .contact-card button{
+      padding:8px 10px;
+      font-size:11px;
+    }
+
+    .gallery{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:8px;
+    }
+
+    .gallery-item{
+      padding:8px;
+      border-radius:12px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.06);
+      text-align:center;
+    }
+
+    .gallery-item img{
+      width:100%;
+      aspect-ratio:1/1;
+      object-fit:cover;
+      border-radius:10px;
+    }
+
+    .gallery-item .tiny{margin-top:6px}
+
+    .modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.72);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      z-index:50;
+    }
+
+    .modal.show{display:flex}
+
+    .modal-box{
+      width:min(760px,100%);
+      padding:18px;
+    }
+
+    .modal-actions{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+      gap:10px;
+      margin-top:14px;
+    }
+
+    .mono{white-space:pre-wrap}
+
+    @keyframes shine{
+      from{left:-100%}
+      to{left:120%}
+    }
+
+    @keyframes ticker{
+      from{transform:translateX(0)}
+      to{transform:translateX(-50%)}
+    }
+
+    @keyframes heatPulse{
+      0%,100%{filter:drop-shadow(0 0 0 transparent)}
+      50%{filter:drop-shadow(0 0 8px rgba(255,93,115,.35))}
+    }
+
+    @keyframes fadeIn{
+      from{opacity:0;transform:translateY(8px)}
+      to{opacity:1;transform:translateY(0)}
+    }
+
+    @keyframes driveAcross{
+      from{left:-45px}
+      to{left:calc(100% + 20px)}
+    }
+
+    @media (max-width:1100px){
+      .wrap{grid-template-columns:1fr}
+      .main{min-height:auto}
+      .hide-mobile{display:none}
+      .tabs{display:grid}
+      .mobile-pane{display:none}
+      .mobile-pane.active{display:block}
+      .cityline{grid-template-columns:1fr 1fr}
+      #log{max-height:none}
+    }
+
+    @media (max-width:720px){
+      .wrap{padding:10px}
+      .title{font-size:24px}
+      .stats-grid,.small-controls,.cityline,.gallery{grid-template-columns:1fr}
+      .dock{left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+      .action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      button{padding:13px 9px;font-size:13px}
+      .show-mobile{display:block}
+    }
+  </style>
+</head>
+<body>
+  <div class="toast" id="toast"></div>
+
+  <div class="wrap">
+    <aside class="panel hide-mobile">
+      <div class="panel-header"><h2>Player File</h2></div>
+      <div class="panel-body" id="desktopPlayerPane"></div>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <div class="title">Vice Districts: Character Build</div>
+        <div class="subtitle">
+          Real portrait assets, full contact roster, and a working “Call Static” button.
+          The city finally has faces that look back.
+        </div>
+        <div class="ticker">
+          <div class="ticker-label">Vice Wire</div>
+          <div class="ticker-text">
+            Static has a line on fast cash • Candy Chrome knows who is cheating • Big Lucho can find product • Silk is watching • Sheriff Rawlins hates your type • Static has a line on fast cash
+          </div>
+        </div>
+        <div class="chase-strip"><div class="car" id="carAnim">🚗</div></div>
+      </section>
+
+      <section class="tabs show-mobile">
+        <button class="tab-btn active" data-tab="hud">HUD</button>
+        <button class="tab-btn" data-tab="city">City</button>
+        <button class="tab-btn" data-tab="logpane">Log</button>
+        <button class="tab-btn" data-tab="stuff">Roster</button>
+      </section>
+
+      <section class="panel mobile-pane active" id="tab-hud">
+        <div class="panel-header"><h2>Player File</h2></div>
+        <div class="panel-body" id="mobilePlayerPane"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header"><h2>City Map</h2></div>
+        <div class="panel-body cityline mobile-pane" id="map"></div>
+      </section>
+
+      <section class="surface mobile-pane" id="tab-logpane">
+        <div class="panel-header" style="margin:-12px -12px 12px -12px;border-radius:16px 16px 0 0;">
+          <h2>Latest Chaos</h2>
+        </div>
+        <div id="log" class="mono"></div>
+      </section>
+
+      <section class="panel hide-mobile">
+        <div class="panel-header"><h2>Vice Contacts / Inventory</h2></div>
+        <div class="panel-body" id="desktopStuffPane"></div>
+      </section>
+
+      <section class="panel mobile-pane" id="tab-stuff">
+        <div class="panel-header"><h2>Vice Contacts / Inventory</h2></div>
+        <div class="panel-body" id="mobileStuffPane"></div>
+      </section>
+    </main>
+
+    <aside class="panel hide-mobile">
+      <div class="panel-header"><h2>Character Roster</h2></div>
+      <div class="panel-body" id="rightStuffPane"></div>
+    </aside>
+  </div>
+
+  <div class="dock">
+    <div class="dock-head">
+      <div class="dock-title">Do Crime</div>
+      <div class="quick-status" id="quickStatus">Pick a move.</div>
+    </div>
+    <div class="action-grid" id="actions"></div>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-box">
+      <div class="portrait-wrap">
+        <img id="modalPortrait" class="portrait" alt="portrait" style="display:none">
+        <div style="flex:1 1 auto">
+          <h2 id="modalTitle" style="margin:0"></h2>
+          <div id="modalBody" class="mono" style="margin-top:10px;"></div>
+        </div>
+      </div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <script>
+    const SAVE_KEY = 'vice_districts_character_build_v1';
+    const CHAR_PATH = 'assets/characters/';
+
+    const characters = {
+      player: {
+        name: 'Tommy "Drift" Malone',
+        role: 'Washed-up survivor',
+        file: 'tommy-drift-malone.png',
+        quote: 'Everybody starts somewhere. I started in a ditch and worked up.'
+      },
+      candy: {
+        name: 'Candy Chrome',
+        role: 'Nightclub fixer',
+        file: 'candy-chrome.png',
+        quote: 'Sweetheart, I am not expensive. Your mistakes are expensive.'
+      },
+      roxie: {
+        name: 'Roxie Del Mar',
+        role: 'Gossip broker',
+        file: 'roxie-del-mar.png',
+        quote: 'The city talks after midnight. I just happen to bill by the hour.'
+      },
+      nina: {
+        name: 'Nina Velez',
+        role: 'Yacht smuggler liaison',
+        file: 'nina-velez.png',
+        quote: 'Out on the water, nobody hears a conscience anyway.'
+      },
+      vivienne: {
+        name: 'Vivienne Cross',
+        role: 'Vice Heights socialite',
+        file: 'vivienne-cross.png',
+        quote: 'Darling, money is vulgar. Secrets are classy.'
+      },
+      marco: {
+        name: 'Detective Marco Reyes',
+        role: 'Undercover cop',
+        file: 'marco-reyes.png',
+        quote: 'Everybody lies. I just write it down.'
+      },
+      chrome: {
+        name: 'Officer Rick "Chrome" Dalton',
+        role: 'Motorcycle cop',
+        file: 'rick-chrome-dalton.png',
+        quote: 'If I catch you, I tow the car and your self-respect.'
+      },
+      hammer: {
+        name: 'Sergeant Blake "Hammer" Voss',
+        role: 'SWAT',
+        file: 'blake-hammer-voss.png',
+        quote: 'When I show up, your evening has already gone badly.'
+      },
+      duke: {
+        name: 'Sheriff Douglas "Duke" Rawlins',
+        role: 'Miami-Dade sheriff',
+        file: 'duke-rawlins.png',
+        quote: 'I do not chase punks. I collect them.'
+      },
+      silk: {
+        name: 'Vincent "Silk" Carbone',
+        role: 'Mobster',
+        file: 'vincent-silk-carbone.png',
+        quote: 'Politeness is free. Disrespect is very expensive.'
+      },
+      lucho: {
+        name: 'Luis "Big Lucho" Herrera',
+        role: 'Street supplier',
+        file: 'big-lucho-herrera.png',
+        quote: 'I can get almost anything. The rest takes two days.'
+      },
+      eddie: {
+        name: 'Eddie "Static" Vega',
+        role: 'Fixer / info broker',
+        file: 'eddie-static-vega.png',
+        quote: 'You do not find jobs, kid. Jobs find me.'
+      }
+    };
+
+    const districts = [
+      {
+        id: 'sunset_strip',
+        name: 'Sunset Strip',
+        unlockRespect: 0,
+        flavor: 'Tourists, clubs, cocaine cologne, and convertibles nobody can afford honestly.'
+      },
+      {
+        id: 'marina_glitz',
+        name: 'Marina Glitz',
+        unlockRespect: 2,
+        flavor: 'Yachts, models, smugglers, and rich idiots marinating in bad decisions.'
+      },
+      {
+        id: 'vice_heights',
+        name: 'Vice Heights',
+        unlockRespect: 4,
+        flavor: 'Suits, bankers, blackmail, and cocaine with a corporate expense code.'
+      },
+      {
+        id: 'dockside',
+        name: 'Dockside',
+        unlockRespect: 6,
+        flavor: 'Rust, cargo, union goons, and enough stolen merchandise to start a Walmart.'
+      },
+      {
+        id: 'cypress_flats',
+        name: 'Cypress Flats',
+        unlockRespect: 9,
+        flavor: 'Swamp edges, biker filth, meth fumes, and people who consider tetanus a mindset.'
+      }
+    ];
+
+    const contactsByDistrict = {
+      sunset_strip: ['candy', 'roxie', 'eddie'],
+      marina_glitz: ['nina', 'eddie'],
+      vice_heights: ['vivienne', 'silk', 'eddie'],
+      dockside: ['lucho', 'marco', 'eddie'],
+      cypress_flats: ['hammer', 'duke', 'chrome']
+    };
+
+    const opportunities = [
+      {
+        title: 'Promoter Envelope',
+        reward: [220, 480],
+        heat: 0,
+        rep: 1,
+        text: 'A nightclub promoter forgot an envelope at the back office. Static says take it before memory returns.'
+      },
+      {
+        title: 'Marina Pickup',
+        reward: [380, 760],
+        heat: 1,
+        rep: 1,
+        text: 'A quiet pickup at Marina Glitz. Quiet in Vice City is always relative.'
+      },
+      {
+        title: 'Rich Boy Shakedown',
+        reward: [520, 980],
+        heat: 1,
+        rep: 2,
+        text: 'A spoiled heir needs reminding that debts are real.'
+      },
+      {
+        title: 'Dockside Diversion',
+        reward: [700, 1200],
+        heat: 2,
+        rep: 2,
+        text: 'Create a loud distraction so a container quietly disappears.'
+      }
+    ];
+
+    let state;
+    let currentTab = 'hud';
+
+    function baseState() {
+      return {
+        player: {
+          name: characters.player.name,
+          cash: 650,
+          health: 100,
+          armor: 0,
+          wanted: 0,
+          day: 1,
+          hour: 8,
+          district: 'sunset_strip',
+          respect: 1,
+          charisma: 1,
+          combat: 1,
+          business: 1,
+          known: ['player', 'candy', 'roxie', 'eddie'],
+          story: 0
+        },
+        log: [],
+        world: {
+          unlocked: ['sunset_strip']
+        }
+      };
+    }
+
+    const fmtCash = n => '$' + Math.floor(n).toLocaleString();
+    const currentDistrict = () => districts.find(d => d.id === state.player.district);
+    const starString = n => Array.from({ length: 5 }, (_, i) => i < n ? '★' : '☆').join(' ');
+    const randomInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+    const pick = a => a[Math.floor(Math.random() * a.length)];
+    const roll = c => Math.random() < c;
+
+    function portraitSrc(key) {
+      return CHAR_PATH + (characters[key]?.file || '');
+    }
+
+    function addLog(text) {
+      state.log.unshift({ text });
+      state.log = state.log.slice(0, 120);
+      renderLog();
+      autoSave();
+    }
+
+    function renderLog() {
+      document.getElementById('log').innerHTML = state.log
+        .map(e => `<div class="entry">${e.text}</div>`)
+        .join('');
+    }
+
+    function showToast(t) {
+      const el = document.getElementById('toast');
+      el.textContent = t;
+      el.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => el.classList.remove('show'), 1500);
+    }
+
+    function animateCar(icon = '🚗') {
+      const car = document.getElementById('carAnim');
+      car.textContent = icon;
+      car.classList.remove('run');
+      void car.offsetWidth;
+      car.classList.add('run');
+    }
+
+    function timeString() {
+      return `Day ${state.player.day} / ${String(state.player.hour).padStart(2, '0')}:00`;
+    }
+
+    function unlockDistricts() {
+      for (const d of districts) {
+        if (!state.world.unlocked.includes(d.id) && state.player.respect >= d.unlockRespect) {
+          state.world.unlocked.push(d.id);
+          addLog(`<span class="cyan">New district unlocked:</span> <strong>${d.name}</strong>. ${d.flavor}`);
+          showToast(`${d.name} unlocked`);
+        }
+      }
+    }
+
+    function advanceTime(h = 1) {
+      state.player.hour += h;
+      while (state.player.hour >= 24) {
+        state.player.hour -= 24;
+        state.player.day += 1;
+        if (state.player.wanted > 0) {
+          state.player.wanted = Math.max(0, state.player.wanted - 1);
+        }
+      }
+      unlockDistricts();
+      render();
+    }
+
+    function showModal(title, body, actions = [], portraitKey = null) {
+      document.getElementById('modalTitle').innerHTML = title;
+      document.getElementById('modalBody').innerHTML = body;
+
+      const img = document.getElementById('modalPortrait');
+      if (portraitKey && characters[portraitKey]) {
+        img.src = portraitSrc(portraitKey);
+        img.style.display = 'block';
+      } else {
+        img.style.display = 'none';
+      }
+
+      const wrap = document.getElementById('modalActions');
+      wrap.innerHTML = '';
+
+      actions.forEach(a => {
+        const btn = document.createElement('button');
+        btn.textContent = a.label;
+        btn.className = a.className || '';
+        btn.onclick = () => {
+          closeModal();
+          a.onClick();
+        };
+        wrap.appendChild(btn);
+      });
+
+      if (!actions.length) {
+        const btn = document.createElement('button');
+        btn.textContent = 'Close';
+        btn.onclick = closeModal;
+        wrap.appendChild(btn);
+      }
+
+      document.getElementById('modal').classList.add('show');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('show');
+    }
+
+    window.onclick = e => {
+      if (e.target.id === 'modal') closeModal();
+    };
+
+    function travelMenu() {
+      showModal(
+        'Travel',
+        'Pick a district.',
+        districts.map(d => ({
+          label: `${d.name}${state.world.unlocked.includes(d.id) ? '' : ' (Locked)'}`,
+          className: state.world.unlocked.includes(d.id) ? 'secondary' : 'dark',
+          onClick: () => travelTo(d.id)
+        }))
+      );
+    }
+
+    function travelTo(id) {
+      const d = districts.find(x => x.id === id);
+      if (!state.world.unlocked.includes(id)) {
+        addLog(`You can drive by <strong>${d.name}</strong>, but nobody there takes you seriously yet.`);
+        return;
+      }
+      state.player.district = id;
+      addLog(`You cruise into <strong>${d.name}</strong>. ${d.flavor}`);
+      animateCar('🏎️');
+      advanceTime(1);
+    }
+
+    function basicCrime() {
+      const take = randomInt(90, 260) + state.player.charisma * 8;
+      if (roll(0.24 + state.player.wanted * 0.06)) {
+        state.player.wanted = Math.min(5, state.player.wanted + 1);
+        addLog('A simple score gets messy. Somebody talks, sirens bloom, and your heat climbs.');
+        showToast('Heat up');
+      } else {
+        state.player.cash += take;
+        state.player.respect = Math.min(12, state.player.respect + 1);
+        addLog(`You work a low-level score and pocket <span class="lime">${fmtCash(take)}</span>. Nobody writes songs about this, but it pays.`);
+        showToast(`+${fmtCash(take)}`);
+      }
+      advanceTime(2);
+    }
+
+    function callStatic() {
+      const job = pick(opportunities);
+      showModal(
+        'Call Eddie "Static" Vega',
+        `<strong>${characters.eddie.quote}</strong><br><br>${job.text}<br><br><span class="tiny">Expected take: ${fmtCash(job.reward[0])} - ${fmtCash(job.reward[1])}</span>`,
+        [
+          {
+            label: 'Take the lead',
+            className: 'good',
+            onClick: () => {
+              const pay = randomInt(job.reward[0], job.reward[1]);
+              state.player.cash += pay;
+              state.player.respect = Math.min(12, state.player.respect + job.rep);
+              state.player.wanted = Math.min(5, state.player.wanted + job.heat);
+              addLog(`<strong>Static</strong> routes you into <strong>${job.title}</strong>. You clear <span class="lime">${fmtCash(pay)}</span> and come out looking a little more dangerous.`);
+              showToast(`Static paid ${fmtCash(pay)}`);
+              advanceTime(3);
+            }
+          },
+          {
+            label: 'Buy intel ($110)',
+            className: 'secondary',
+            onClick: () => {
+              if (state.player.cash < 110) {
+                addLog('Static hangs up. Apparently information is not a charity.');
+                return;
+              }
+              state.player.cash -= 110;
+              const clue = pick([
+                'Silk is feeling generous with contracts tonight.',
+                'Marco Reyes is sniffing around Dockside.',
+                'Candy Chrome knows which promoter is weak.',
+                'Big Lucho has fresh product and bad patience.'
+              ]);
+              addLog(`<strong>Static</strong> sells you a lead: <span class="cyan">${clue}</span>`);
+              showToast('Intel bought');
+              advanceTime(1);
+            }
+          },
+          {
+            label: 'Tell him to get lost',
+            className: 'dark',
+            onClick: () => addLog('Static laughs, calls you sentimental, and hangs up.')
+          }
+        ],
+        'eddie'
+      );
+    }
+
+    function nightlife() {
+      const people = contactsByDistrict[state.player.district] || [];
+      showModal(
+        'Vice Contacts',
+        'Every city has vice. Yours has portraits.',
+        people.map(k => ({
+          label: characters[k].name,
+          className: 'secondary',
+          onClick: () => openCharacter(k)
+        }))
+      );
+    }
+
+    function openCharacter(key) {
+      const c = characters[key];
+      let body = `<strong>${c.role}</strong><br><br>${c.quote}`;
+      let actions = [{ label: 'Close', className: 'dark', onClick: () => {} }];
+
+      if (key === 'candy') {
+        actions = [
+          {
+            label: 'Buy rumor ($120)',
+            className: 'good',
+            onClick: () => {
+              if (state.player.cash < 120) {
+                addLog('Candy smiles. Poverty is not seductive.');
+                return;
+              }
+              state.player.cash -= 120;
+              state.player.charisma++;
+              addLog(`<strong>Candy Chrome</strong> sells you a filthy rumor with clean diction. Useful.`);
+              showToast('Rumor bought');
+              advanceTime(1);
+            }
+          },
+          {
+            label: 'Flirt for respect',
+            className: 'secondary',
+            onClick: () => {
+              if (roll(0.5)) {
+                state.player.respect++;
+                addLog('Candy laughs at one of your lines and, against reason, your reputation improves.');
+              } else {
+                addLog('Candy stares like you just tried poetry in a gunfight.');
+              }
+              advanceTime(1);
+            }
+          }
+        ];
+      }
+
+      if (key === 'roxie') {
+        actions = [
+          {
+            label: 'After-hours ride ($180)',
+            className: 'warn',
+            onClick: () => {
+              if (state.player.cash < 180) {
+                addLog('Roxie does not work on faith.');
+                return;
+              }
+              state.player.cash -= 180;
+              const r = Math.random();
+              if (r < 0.33) {
+                state.player.health = Math.min(100, state.player.health + 12);
+                state.player.wanted = Math.max(0, state.player.wanted - 1);
+                addLog('The car rocks discreetly. You emerge calmer, poorer, and slightly harder to arrest.');
+              } else if (r < 0.66) {
+                addLog('Roxie fixes her lipstick and hands you a tip worth more than the ride.');
+              } else {
+                const skim = Math.min(state.player.cash, randomInt(40, 110));
+                state.player.cash -= skim;
+                addLog(`Roxie exits gracefully. So does another ${fmtCash(skim)} from your pocket.`);
+              }
+              showToast('Roxie time');
+              advanceTime(2);
+            }
+          },
+          {
+            label: 'Buy gossip ($90)',
+            className: 'good',
+            onClick: () => {
+              if (state.player.cash < 90) {
+                addLog('No money, no gossip.');
+                return;
+              }
+              state.player.cash -= 90;
+              addLog('Roxie leans in and drops a piece of gossip that smells like opportunity.');
+              advanceTime(1);
+            }
+          }
+        ];
+      }
+
+      if (key === 'nina') {
+        actions = [
+          {
+            label: 'Smuggler lead ($150)',
+            className: 'good',
+            onClick: () => {
+              if (state.player.cash < 150) {
+                addLog('Nina only talks to people with folding money.');
+                return;
+              }
+              state.player.cash -= 150;
+              state.player.business++;
+              addLog('Nina slides you a marina slip number and a departure time. Somewhere, contraband smiles.');
+              showToast('Marina lead');
+              advanceTime(1);
+            }
+          },
+          {
+            label: 'Champagne ride ($220)',
+            className: 'warn',
+            onClick: () => {
+              if (state.player.cash < 220) {
+                addLog('Yacht girls are not budget entertainment.');
+                return;
+              }
+              state.player.cash -= 220;
+              state.player.wanted = Math.max(0, state.player.wanted - 1);
+              addLog('You spend a reckless hour pretending consequences are for pedestrians.');
+              advanceTime(2);
+            }
+          }
+        ];
+      }
+
+      if (key === 'vivienne') {
+        actions = [
+          {
+            label: 'Buy elite dirt ($240)',
+            className: 'good',
+            onClick: () => {
+              if (state.player.cash < 240) {
+                addLog('Vivienne does not do discount scandal.');
+                return;
+              }
+              state.player.cash -= 240;
+              state.player.charisma++;
+              state.player.business++;
+              addLog('Vivienne sells you the kind of secret that wears cufflinks.');
+              advanceTime(1);
+            }
+          },
+          {
+            label: 'Luxury ride ($260)',
+            className: 'warn',
+            onClick: () => {
+              if (state.player.cash < 260) {
+                addLog('Class has a cover charge.');
+                return;
+              }
+              state.player.cash -= 260;
+              addLog('Luxury, perfume, and poor decisions. A very Vice Heights evening.');
+              advanceTime(2);
+            }
+          }
+        ];
+      }
+
+      if (key === 'silk') {
+        actions = [
+          {
+            label: 'Request a contract',
+            className: 'good',
+            onClick: () => {
+              const pay = randomInt(800, 1600);
+              state.player.cash += pay;
+              state.player.respect += 2;
+              addLog(`<strong>Silk Carbone</strong> hands you a polite contract and an impolite deadline. You clear <span class="lime">${fmtCash(pay)}</span>.`);
+              showToast('Mob work');
+              advanceTime(3);
+            }
+          },
+          {
+            label: 'Pay respect',
+            className: 'secondary',
+            onClick: () => {
+              addLog('Silk accepts your manners and remembers your face. That is either good or fatal.');
+              state.player.respect++;
+              advanceTime(1);
+            }
+          }
+        ];
+      }
+
+      if (key === 'lucho') {
+        actions = [
+          {
+            label: 'Buy product lead ($140)',
+            className: 'good',
+            onClick: () => {
+              if (state.player.cash < 140) {
+                addLog('Lucho taps his watch. No money, no movement.');
+                return;
+              }
+              state.player.cash -= 140;
+              state.player.business++;
+              addLog('Big Lucho points you toward fresh inventory and terrible company.');
+              advanceTime(1);
+            }
+          },
+          {
+            label: 'Have a drink',
+            className: 'secondary',
+            onClick: () => {
+              addLog('Lucho tells a story that somehow includes three cousins, two knives, and a goat.');
+              advanceTime(1);
+            }
+          }
+        ];
+      }
+
+      if (key === 'marco' || key === 'chrome' || key === 'hammer' || key === 'duke') {
+        actions = [
+          {
+            label: 'Act innocent',
+            className: 'secondary',
+            onClick: () => {
+              if (roll(0.4)) {
+                state.player.wanted = Math.max(0, state.player.wanted - 1);
+                addLog(`${c.name} buys your act for now. A civic tragedy.`);
+              } else {
+                state.player.wanted = Math.min(5, state.player.wanted + 1);
+                addLog(`${c.name} does not buy a word of it. Heat rises.`);
+              }
+              advanceTime(1);
+            }
+          },
+          {
+            label: 'Leave quietly',
+            className: 'dark',
+            onClick: () => addLog(`You leave ${c.name} to his badge, his ego, and his pension fantasy.`)
+          }
+        ];
+      }
+
+      if (key === 'eddie') {
+        actions = [
+          {
+            label: 'Call Static',
+            className: 'good',
+            onClick: callStatic
+          },
+          {
+            label: 'Buy intel ($110)',
+            className: 'secondary',
+            onClick: () => {
+              if (state.player.cash < 110) {
+                addLog('Static hangs up.');
+                return;
+              }
+              state.player.cash -= 110;
+              addLog('Static sells you a line on fast money. It probably involves danger.');
+              advanceTime(1);
+            }
+          }
+        ];
+      }
+
+      showModal(c.name, body, actions, key);
+    }
+
+    function actionDefs() {
+      return [
+        { label: 'Travel', className: 'secondary', handler: travelMenu },
+        { label: 'Low Score', className: 'dark', handler: basicCrime },
+        { label: 'Vice Contacts', className: 'warn', handler: nightlife },
+        { label: 'Call Static', className: 'good', handler: callStatic },
+        {
+          label: 'Lay Low',
+          className: 'secondary',
+          handler: () => {
+            state.player.health = Math.min(100, state.player.health + 15);
+            state.player.wanted = Math.max(0, state.player.wanted - 1);
+            addLog('You disappear for a bit and let the city obsess over somebody else.');
+            advanceTime(3);
+          }
+        },
+        {
+          label: 'Mission',
+          className: 'good',
+          handler: () => {
+            const step = state.player.story;
+            if (step === 0) {
+              showModal(
+                'Mission: Candy Chrome',
+                'Candy needs a nightclub envelope retrieved before dawn.',
+                [{
+                  label: 'Do it',
+                  className: 'good',
+                  onClick: () => {
+                    const pay = randomInt(900, 1400);
+                    state.player.cash += pay;
+                    state.player.story = 1;
+                    state.player.respect += 2;
+                    addLog(`Candy pays <span class="lime">${fmtCash(pay)}</span> and decides you might actually be useful.`);
+                    advanceTime(3);
+                  }
+                }],
+                'candy'
+              );
+            } else if (step === 1) {
+              showModal(
+                'Mission: Nina Velez',
+                'Nina has a sealed crate and a short timetable.',
+                [{
+                  label: 'Run the crate',
+                  className: 'good',
+                  onClick: () => {
+                    const pay = randomInt(1800, 2600);
+                    state.player.cash += pay;
+                    state.player.story = 2;
+                    state.player.respect += 2;
+                    addLog(`You deliver Nina's crate and earn <span class="lime">${fmtCash(pay)}</span>. Nobody asks questions. Smart.`);
+                    advanceTime(4);
+                  }
+                }],
+                'nina'
+              );
+            } else {
+              showModal(
+                'Mission: Silk Carbone',
+                'Silk has higher-class problems and dirtier-class solutions.',
+                [{
+                  label: 'Take contract',
+                  className: 'good',
+                  onClick: () => {
+                    const pay = randomInt(2600, 4200);
+                    state.player.cash += pay;
+                    state.player.story = 3;
+                    state.player.respect += 3;
+                    addLog(`Silk pays <span class="lime">${fmtCash(pay)}</span>. You are officially a more serious kind of problem.`);
+                    advanceTime(4);
+                  }
+                }],
+                'silk'
+              );
+            }
+          }
+        }
+      ];
+    }
+
+    function playerPaneHTML() {
+      return `
+        <div class="stats-grid">
+          <div class="stat">
+            <div class="label">Name</div>
+            <div class="value">${state.player.name}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Cash</div>
+            <div class="value lime">${fmtCash(state.player.cash)}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Health</div>
+            <div class="value">${state.player.health}</div>
+            <div class="meter"><div class="fill" style="width:${state.player.health}%"></div></div>
+          </div>
+          <div class="stat">
+            <div class="label">Heat</div>
+            <div class="value danger wanted-stars">${starString(state.player.wanted)}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Respect</div>
+            <div class="value">${state.player.respect}</div>
+          </div>
+          <div class="stat">
+            <div class="label">Day / Time</div>
+            <div class="value">${timeString()}</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px" class="mini-card">
+          <div class="label">District</div>
+          <div class="value">${currentDistrict().name}</div>
+          <div class="tiny">${currentDistrict().flavor}</div>
+        </div>
+
+        <div class="small-controls">
+          <button class="secondary" onclick="saveGame()">Save</button>
+          <button class="warn" onclick="loadGame()">Load</button>
+          <button class="dark" onclick="newGame(true)">New Game</button>
+          <button class="good" onclick="openCharacter('player')">Player Portrait</button>
+        </div>
+      `;
+    }
+
+    function contactsHTML() {
+      return state.player.known
+        .filter(k => k !== 'player')
+        .map(k => `
+          <div class="contact-card">
+            <img class="contact-thumb" src="${portraitSrc(k)}">
+            <div style="flex:1 1 auto">
+              <div><strong>${characters[k].name}</strong></div>
+              <div class="tiny">${characters[k].role}</div>
+            </div>
+            <button class="secondary" onclick="openCharacter('${k}')">Open</button>
+          </div>
+        `)
+        .join('');
+    }
+
+    function rosterHTML() {
+      return Object.entries(characters)
+        .filter(([k]) => k !== 'player')
+        .map(([k, v]) => `
+          <div class="gallery-item">
+            <img src="${portraitSrc(k)}">
+            <div class="tiny">
+              <strong>${v.name}</strong><br>${v.role}
+            </div>
+            <div style="margin-top:6px">
+              <button class="secondary" onclick="openCharacter('${k}')">Open</button>
+            </div>
+          </div>
+        `)
+        .join('');
+    }
+
+    function stuffPaneHTML() {
+      return `
+        <div class="mini-card">
+          <div class="label">Known Contacts</div>
+          <div style="margin-top:8px">${contactsHTML()}</div>
+        </div>
+
+        <div class="mini-card" style="margin-top:10px">
+          <div class="label">Inventory</div>
+          <div>
+            <span class="chip">Cheap shades</span>
+            <span class="chip">Bad Hawaiian shirt</span>
+            <span class="chip">A plan of questionable quality</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMap() {
+      document.getElementById('map').innerHTML = districts
+        .map(d => {
+          const u = state.world.unlocked.includes(d.id);
+          const c = state.player.district === d.id;
+          return `
+            <div class="district-card ${u ? 'unlocked' : 'locked'} ${c ? 'current' : ''}">
+              <div class="district-name">${d.name}</div>
+              <div class="district-meta">${d.flavor}</div>
+              <div class="tiny" style="margin-top:6px">${u ? 'Unlocked' : `Unlock at Respect ${d.unlockRespect}`}</div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    function renderActions() {
+      const actions = document.getElementById('actions');
+      actions.innerHTML = '';
+      actionDefs().forEach(a => {
+        const btn = document.createElement('button');
+        btn.textContent = a.label;
+        btn.className = a.className || '';
+        btn.onclick = a.handler;
+        actions.appendChild(btn);
+      });
+    }
+
+    function renderPanes() {
+      const p = playerPaneHTML();
+      const s = stuffPaneHTML();
+
+      document.getElementById('desktopPlayerPane').innerHTML = p;
+      document.getElementById('mobilePlayerPane').innerHTML = p;
+      document.getElementById('desktopStuffPane').innerHTML = s;
+      document.getElementById('mobileStuffPane').innerHTML = s;
+      document.getElementById('rightStuffPane').innerHTML = `<div class="gallery">${rosterHTML()}</div>`;
+      document.getElementById('quickStatus').textContent =
+        `${currentDistrict().name} • ${starString(state.player.wanted)} • ${fmtCash(state.player.cash)}`;
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(btn =>
+        btn.classList.toggle('active', btn.dataset.tab === tab)
+      );
+      document.getElementById('tab-hud').classList.toggle('active', tab === 'hud');
+      document.getElementById('map').classList.toggle('active', tab === 'city');
+      document.getElementById('tab-logpane').classList.toggle('active', tab === 'logpane');
+      document.getElementById('tab-stuff').classList.toggle('active', tab === 'stuff');
+      document.getElementById('map').style.display =
+        (tab === 'city' || window.innerWidth > 1100) ? 'grid' : '';
+    }
+
+    function render() {
+      renderPanes();
+      renderMap();
+      renderActions();
+      renderLog();
+      autoSave();
+    }
+
+    function saveGame() {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      addLog(`<span class="good">Game saved.</span> Characters, cash, and bad choices preserved.`);
+      showToast('Saved');
+    }
+
+    function autoSave() {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    }
+
+    function loadGame() {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) {
+        addLog('No save found. Your empire exists only in your imagination.');
+        return;
+      }
+      try {
+        state = JSON.parse(raw);
+        addLog(`<span class="good">Save loaded.</span> Welcome back, troublemaker.`);
+        render();
+        showToast('Loaded');
+      } catch {
+        addLog('Save file corrupted. Very on-brand.');
+      }
+    }
+
+    function newGame(force = false) {
+      if (!force && !confirm('Start over?')) return;
+      state = baseState();
+      state.log = [];
+      addLog(`<span class="hot">New game.</span> Tommy Drift Malone arrives in Vice Districts with a bad shirt, worse timing, and a city full of faces.`);
+      addLog(`Tip: hit <strong>Call Static</strong> early. Eddie gets things moving.`);
+      render();
+      showToast('Fresh meat');
+    }
+
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('.tab-btn');
+      if (btn) switchTab(btn.dataset.tab);
+    });
+
+    (function init() {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (raw) {
+        try {
+          state = JSON.parse(raw);
+        } catch {
+          state = baseState();
+        }
+      } else {
+        state = baseState();
+      }
+
+      if (!state.log?.length) {
+        state.log = [];
+        addLog(`<span class="hot">Welcome to Vice Districts: Character Build.</span> The portraits are real now. So are the bad influences.`);
+        addLog(`Start with <strong>Call Static</strong>, <strong>Vice Contacts</strong>, or a <strong>Low Score</strong>.`);
+      }
+
+      render();
+      switchTab('hud');
+    })();
+  </script>
+</body>
+</html>
