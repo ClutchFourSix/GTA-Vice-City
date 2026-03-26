@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <title>Vice Districts 2D V2.2</title>
+  <style>
+    :root {
+      --bg: #090212;
+      --panel: rgba(20, 8, 34, 0.92);
+      --panel2: rgba(35, 14, 56, 0.96);
+      --text: #ffeefc;
+      --muted: #d4a8cf;
+      --border: rgba(127, 60, 183, 0.95);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --shadow: rgba(0,0,0,0.38);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; overflow: hidden; touch-action: none;
+      background: radial-gradient(circle at top right, rgba(255,77,184,.16), transparent 30%), radial-gradient(circle at bottom left, rgba(94,242,255,.12), transparent 28%), linear-gradient(180deg, #0b0314, var(--bg));
+      color: var(--text); font-family: Consolas, Monaco, "Courier New", monospace;
+    }
+    #shell { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; }
+    #topbar {
+      position: relative; z-index: 20; padding: 10px 12px 8px;
+      background: linear-gradient(180deg, rgba(10,4,18,.95), rgba(10,4,18,.75));
+      border-bottom: 1px solid rgba(255,255,255,.06); backdrop-filter: blur(6px);
+    }
+    #brand { font-weight: 900; letter-spacing: .08em; text-transform: uppercase; font-size: 20px; text-shadow: 0 0 16px rgba(255,77,184,.35); }
+    #status-line { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; font-size: 12px; color: #d4a8cf; }
+    .pill { padding: 6px 8px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.06); }
+    #phaser-root { position: relative; width: 100vw; height: 100%; overflow: hidden; background: #000; }
+    canvas { display: block; width: 100% !important; height: 100% !important; image-rendering: pixelated; image-rendering: crisp-edges; }
+    #bottombar {
+      position: relative; z-index: 20; padding: 10px 12px calc(10px + var(--safe-bottom));
+      background: linear-gradient(180deg, rgba(10,4,18,.75), rgba(10,4,18,.96));
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+    #objective { font-size: 12px; color: #d4a8cf; margin-bottom: 8px; }
+    #hint { font-size: 13px; color: #ffeefc; min-height: 20px; }
+    #overlay { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+    #dialogue, #phone, #intel, #toast, #fatalCard { pointer-events: auto; }
+    #dialogue {
+      position: absolute; left: 12px; right: 12px; bottom: calc(96px + var(--safe-bottom)); display: none;
+      background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 14px 34px var(--shadow); overflow: hidden;
+    }
+    #dialogue.show { display: block; }
+    #dialogue-inner { display: grid; grid-template-columns: 96px 1fr; gap: 12px; padding: 12px; }
+    #portrait { width: 96px; height: 96px; object-fit: cover; border-radius: 14px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); }
+    #dialogue-name { font-weight: 900; letter-spacing: .04em; margin-bottom: 4px; }
+    #dialogue-role { color: #d4a8cf; font-size: 12px; margin-bottom: 10px; }
+    #dialogue-text { font-size: 13px; line-height: 1.45; min-height: 72px; }
+    #dialogue-actions { display: grid; gap: 8px; padding: 0 12px 12px; }
+    .btn { border: none; border-radius: 12px; padding: 12px 10px; font-weight: 800; letter-spacing: .03em; color: white; background: linear-gradient(180deg, #ff4db8, #b62a7d); box-shadow: 0 8px 18px rgba(255,77,184,.22); cursor: pointer; }
+    .btn.secondary { background: linear-gradient(180deg, #5ef2ff, #258eac); }
+    .btn.good { background: linear-gradient(180deg, #79ffb0, #2d9f61); }
+    .btn.warn { background: linear-gradient(180deg, #ffd166, #c08a18); }
+    .btn.dark { background: linear-gradient(180deg, #56316f, #2a1638); box-shadow: none; }
+    #phone, #intel, #fatalCard {
+      position: absolute; top: 82px; right: 12px; width: min(340px, calc(100vw - 24px)); display: none;
+      background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; box-shadow: 0 14px 34px var(--shadow);
+    }
+    #phone.show, #intel.show, #fatalCard.show { display: block; }
+    #fatalCard { left: 12px; right: 12px; top: 50%; transform: translateY(-50%); width: auto; }
+    .panel-head { padding: 12px; border-bottom: 1px solid rgba(255,255,255,.08); font-weight: 900; text-transform: uppercase; letter-spacing: .08em; font-size: 13px; }
+    .panel-body { max-height: 58vh; overflow: auto; padding: 10px; display: grid; gap: 8px; }
+    .contact-row { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 8px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); }
+    .contact-row img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; border: 1px solid rgba(255,255,255,.1); }
+    .contact-name { font-size: 13px; font-weight: 800; }
+    .contact-sub { font-size: 11px; color: #d4a8cf; }
+    .mini-btn { padding: 8px 10px; border-radius: 10px; border: none; background: linear-gradient(180deg, #5ef2ff, #258eac); color: white; font-weight: 800; font-size: 11px; }
+    .line { font-size: 12px; color: #d4a8cf; }
+    #touch-controls { position: absolute; inset: auto 0 0 0; display: none; pointer-events: none; padding: 0 12px calc(88px + var(--safe-bottom)); }
+    #controls-row { display: flex; justify-content: space-between; align-items: flex-end; }
+    #stick, #buttons { pointer-events: auto; }
+    #stick { width: 132px; height: 132px; border-radius: 50%; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); position: relative; touch-action: none; backdrop-filter: blur(4px); }
+    #knob { width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(180deg, rgba(255,255,255,.3), rgba(255,255,255,.12)); border: 1px solid rgba(255,255,255,.18); position: absolute; left: 39px; top: 39px; box-shadow: 0 10px 18px rgba(0,0,0,.25); }
+    #buttons { display: grid; grid-template-columns: repeat(2, 68px); gap: 10px; }
+    .touch-btn { width: 68px; height: 68px; border-radius: 18px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.08); color: white; font-weight: 900; font-size: 12px; backdrop-filter: blur(4px); }
+    #toast { position: absolute; top: 76px; left: 50%; transform: translateX(-50%) translateY(-12px); background: rgba(8,2,14,.94); border: 1px solid rgba(94,242,255,.45); padding: 10px 14px; border-radius: 999px; color: var(--text); opacity: 0; transition: opacity .25s ease, transform .25s ease; box-shadow: 0 10px 22px rgba(0,0,0,.35); white-space: nowrap; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    @media (max-width: 900px) {
+      #touch-controls { display: block; }
+      #dialogue-inner { grid-template-columns: 76px 1fr; }
+      #portrait { width: 76px; height: 76px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="shell">
+    <div id="topbar">
+      <div id="brand">Vice Districts 2D V2.2</div>
+      <div id="status-line">
+        <div class="pill" id="hud-cash">Cash: $0</div>
+        <div class="pill" id="hud-health">Health: 100</div>
+        <div class="pill" id="hud-heat">Heat: ☆ ☆ ☆ ☆ ☆</div>
+        <div class="pill" id="hud-district">District: Sunset Strip</div>
+        <div class="pill" id="hud-vehicle">Ride: On Foot</div>
+        <div class="pill" id="hud-control">Control: 0%</div>
+      </div>
+    </div>
+    <div id="phaser-root"></div>
+    <div id="bottombar">
+      <div id="objective">Objective: Meet Candy Chrome for your first mission.</div>
+      <div id="hint">Move with WASD / arrows. E interacts. Space attacks. Q opens phone. Tab opens intel.</div>
+    </div>
+  </div>
+  <div id="overlay">
+    <div id="toast"></div>
+    <div id="dialogue">
+      <div id="dialogue-inner">
+        <img id="portrait" alt="portrait" />
+        <div>
+          <div id="dialogue-name"></div>
+          <div id="dialogue-role"></div>
+          <div id="dialogue-text"></div>
+        </div>
+      </div>
+      <div id="dialogue-actions"></div>
+    </div>
+    <div id="phone">
+      <div class="panel-head">VicePhone</div>
+      <div class="panel-body" id="phone-body"></div>
+    </div>
+    <div id="intel">
+      <div class="panel-head">Street Intel</div>
+      <div class="panel-body">
+        <div class="line" id="intel-line-1"></div>
+        <div class="line" id="intel-line-2"></div>
+        <div class="line" id="intel-line-3"></div>
+        <div class="line" id="intel-line-4"></div>
+        <button class="btn secondary" id="intel-phone">Phone</button>
+        <button class="btn dark" id="intel-close">Close</button>
+      </div>
+    </div>
+    <div id="fatalCard">
+      <div class="panel-head">Render Failure</div>
+      <div class="panel-body">
+        <div class="line">The game hit a JavaScript error before the scene could render.</div>
+        <div class="line" id="fatalText">Unknown error.</div>
+        <button class="btn secondary" onclick="location.reload()">Reload</button>
+      </div>
+    </div>
+    <div id="touch-controls">
+      <div id="controls-row">
+        <div id="stick"><div id="knob"></div></div>
+        <div id="buttons">
+          <button class="touch-btn" id="touch-action">ACT</button>
+          <button class="touch-btn" id="touch-attack">HIT</button>
+          <button class="touch-btn" id="touch-phone">CALL</button>
+          <button class="touch-btn" id="touch-map">INFO</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+  <script>
+    const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const dist = (a, b) => Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
+    const worldHeightSafe = () => Math.max(420, window.innerHeight - 112);
+    const showFatal = (msg) => { document.getElementById('fatalText').textContent = String(msg || 'Unknown error'); document.getElementById('fatalCard').classList.add('show'); };
+    window.addEventListener('error', (e) => showFatal(e.message || 'Unknown runtime error'));
+
+    const CHAR_PATH = 'assets/characters/';
+    const PORTRAITS = {
+      candy: CHAR_PATH + 'candy-chrome.png',
+      roxie: CHAR_PATH + 'roxie-del-mar.png',
+      nina: CHAR_PATH + 'nina-velez.png',
+      eddie: CHAR_PATH + 'eddie-static-vega.png',
+      silk: CHAR_PATH + 'vincent-silk-carbone.png',
+      chrome: CHAR_PATH + 'rick-chrome-dalton.png',
+      hammer: CHAR_PATH + 'blake-hammer-voss.png'
+    };
+    const CONTACTS = {
+      candy: { key:'candy', name:'Candy Chrome', role:'Nightclub fixer', portrait:PORTRAITS.candy, district:'Sunset Strip', mood:'Amused', intro:'Sweetheart, Vice City runs on weak men, loud music, and late payments. Lucky for you, I know where all three live.' },
+      roxie: { key:'roxie', name:'Roxie Del Mar', role:'Gossip broker', portrait:PORTRAITS.roxie, district:'Sunset Strip', mood:'Mischievous', intro:'The city talks after midnight. I just invoice by the hour.' },
+      eddie: { key:'eddie', name:'Eddie "Static" Vega', role:'Fixer / info broker', portrait:PORTRAITS.eddie, district:'Marina Glitz', mood:'Chaotic', intro:'You do not find jobs, kid. Jobs find me, crawl into my phone, and beg for representation.' },
+      nina: { key:'nina', name:'Nina Velez', role:'Yacht smuggler liaison', portrait:PORTRAITS.nina, district:'Marina Glitz', mood:'Cold', intro:'Out on the water, nobody hears a conscience anyway.' },
+      silk: { key:'silk', name:'Vincent "Silk" Carbone', role:'Mobster', portrait:PORTRAITS.silk, district:'Vice Heights', mood:'Polite', intro:'Politeness is free. Disrespect is very expensive.' }
+    };
+
+    const state = {
+      cash: 1000,
+      health: 100,
+      heat: 0,
+      district: 'Sunset Strip',
+      vehicle: null,
+      inVehicle: false,
+      control: { 'Sunset Strip': 5, 'Marina Glitz': 0, 'Vice Heights': 0, 'Dockside': 0, 'Cypress Flats': 0 },
+      loyalty: { candy: 0, roxie: 0, eddie: 0, nina: 0, silk: 0 },
+      objective: 'Meet Candy Chrome for your first mission.',
+      hint: 'Move with WASD / arrows. E interacts. Space attacks. Q opens phone. Tab opens intel.',
+      mission: { active:null, step:0, completed:[] },
+      policeCooldown: 0,
+      policeLockTimer: 0,
+      policeIgnoreTimer: 0,
+      policeDroppedTimer: 0,
+      damageCooldown: 0,
+      businesses: [],
+      unlocked: { marina: false, silk: false },
+      thugsDropped: 0,
+      secrets: 0
+    };
+
+    const ui = {
+      cash: document.getElementById('hud-cash'),
+      health: document.getElementById('hud-health'),
+      heat: document.getElementById('hud-heat'),
+      district: document.getElementById('hud-district'),
+      vehicle: document.getElementById('hud-vehicle'),
+      control: document.getElementById('hud-control'),
+      objective: document.getElementById('objective'),
+      hint: document.getElementById('hint'),
+      toast: document.getElementById('toast'),
+      dialogue: document.getElementById('dialogue'),
+      portrait: document.getElementById('portrait'),
+      dialogueName: document.getElementById('dialogue-name'),
+      dialogueRole: document.getElementById('dialogue-role'),
+      dialogueText: document.getElementById('dialogue-text'),
+      dialogueActions: document.getElementById('dialogue-actions'),
+      phone: document.getElementById('phone'),
+      phoneBody: document.getElementById('phone-body'),
+      intel: document.getElementById('intel')
+    };
+
+    function stars(n){ return Array.from({length:5},(_,i)=>i<n?'★':'☆').join(' '); }
+    function money(n){ return '$' + Math.floor(n).toLocaleString(); }
+    function toast(text){ ui.toast.textContent=text; ui.toast.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>ui.toast.classList.remove('show'),1500); }
+    function updateHUD(){ ui.cash.textContent=`Cash: ${money(state.cash)}`; ui.health.textContent=`Health: ${state.health}`; ui.heat.textContent=`Heat: ${stars(state.heat)}`; ui.district.textContent=`District: ${state.district}`; ui.vehicle.textContent=`Ride: ${state.vehicle ? state.vehicle.label : 'On Foot'}`; ui.control.textContent=`Control: ${state.control[state.district]||0}%`; ui.objective.textContent=`Objective: ${state.objective}`; ui.hint.textContent=state.hint; }
+    function closeDialogue(){ ui.dialogue.classList.remove('show'); }
+    function openDialogue(contact,text,actions){ ui.portrait.src=contact.portrait; ui.portrait.onerror=()=>{ ui.portrait.style.display='none'; }; ui.portrait.onload=()=>{ ui.portrait.style.display='block'; }; ui.dialogueName.textContent=contact.name; ui.dialogueRole.textContent=`${contact.role} • ${contact.mood||'Unreadable'}`; ui.dialogueText.textContent=text; ui.dialogueActions.innerHTML=''; actions.forEach(a=>{ const b=document.createElement('button'); b.className=`btn ${a.variant||''}`.trim(); b.textContent=a.label; b.onclick=()=>{ closeDialogue(); a.onClick(); }; ui.dialogueActions.appendChild(b); }); ui.dialogue.classList.add('show'); }
+    function openPhone(scene){ ui.phoneBody.innerHTML=''; Object.values(CONTACTS).forEach(contact=>{ if(contact.key==='silk'&&!state.unlocked.silk) return; if(contact.key==='nina'&&!state.unlocked.marina) return; const row=document.createElement('div'); row.className='contact-row'; row.innerHTML=`<img src="${contact.portrait}" alt="${contact.name}"><div><div class="contact-name">${contact.name}</div><div class="contact-sub">${contact.role} • Loyalty ${state.loyalty[contact.key]||0}</div></div>`; const btn=document.createElement('button'); btn.className='mini-btn'; btn.textContent='CALL'; btn.onclick=()=>{ ui.phone.classList.remove('show'); phoneCall(scene,contact.key); }; row.appendChild(btn); ui.phoneBody.appendChild(row); }); ui.phone.classList.add('show'); }
+    function closePhone(){ ui.phone.classList.remove('show'); }
+    function openIntel(){ document.getElementById('intel-line-1').textContent=`Mission: ${state.mission.active||'None'}`; document.getElementById('intel-line-2').textContent=`Police: ignore ${Math.ceil(state.policeIgnoreTimer/60)}s • lock ${Math.ceil(state.policeLockTimer/60)}s`; document.getElementById('intel-line-3').textContent=`Secrets found: ${state.secrets} • Thugs dropped: ${state.thugsDropped}`; document.getElementById('intel-line-4').textContent=`District control here: ${state.control[state.district]||0}%`; ui.intel.classList.add('show'); }
+    function closeIntel(){ ui.intel.classList.remove('show'); }
+    function phoneCall(scene,key){ if(key==='eddie'){ state.cash+=180; state.loyalty.eddie+=1; state.objective='Eddie says the marina stash is live. Drive east, then go south to the water.'; state.hint='The glowing cyan ring at the marina is worth checking.'; toast('Static sold a hot lead.'); } else if(key==='roxie'){ state.loyalty.roxie+=1; state.hint='Roxie says bike cops are lazy near the south road for a little while.'; toast('Roxie dropped gossip.'); } else if(key==='candy'){ state.loyalty.candy+=1; state.objective='Candy wants pressure on a promoter and more money in her hand.'; toast('Candy made your day worse.'); } else if(key==='nina'){ state.loyalty.nina+=1; state.objective='Nina wants a package moved once you prove you can drive without dying.'; toast('Nina has work.'); } else if(key==='silk'){ state.loyalty.silk+=1; state.objective='Silk wants elegant chaos in Vice Heights.'; toast('Silk noticed you.'); } updateHUD(); }
+    function dropPolice(scene, reason){ state.policeIgnoreTimer = 720; state.policeLockTimer = 0; state.policeDroppedTimer = 360; toast(reason || 'Police backed off.'); scene && scene.resetPolicePositions(); updateHUD(); }
+    function policeEncounter(scene, reason){ if(state.policeCooldown>0 || state.policeIgnoreTimer>0) return; state.policeCooldown=240; const officer=state.heat>=3?{name:'Sergeant Hammer Voss',role:'SWAT',portrait:PORTRAITS.hammer,mood:'Hostile'}:{name:'Officer Rick "Chrome" Dalton',role:'Motorcycle Cop',portrait:PORTRAITS.chrome,mood:'Annoyed'}; openDialogue(officer, state.heat>=3?`When I show up, your evening already went badly. This is about ${reason}.`:`If I catch you again after ${reason}, I tow the car and your self-respect.`, [ {label:'Run',variant:'secondary',onClick:()=>{ const chance=state.inVehicle?0.72:0.48; if(Math.random()<chance){ state.heat=Math.max(0,state.heat-2); dropPolice(scene,'You lost them in the neon.'); }else{ state.heat=Math.min(5,state.heat+1); state.health=Math.max(1,state.health-12); state.policeLockTimer=720; toast('Pursuit went badly.'); } updateHUD(); }}, {label:'Bribe',variant:'good',onClick:()=>{ const cost=90+state.heat*65; if(state.cash>=cost){ state.cash-=cost; state.heat=Math.max(0,state.heat-2); dropPolice(scene,`Paid ${money(cost)}. Police looked the other way.`); }else{ state.heat=Math.min(5,state.heat+1); state.policeLockTimer=720; toast('Too broke to be corrupt.'); } updateHUD(); }} ]); }
+
+    class BootScene extends Phaser.Scene { constructor(){ super('BootScene'); } create(){ this.scene.start('WorldScene'); } }
+    class WorldScene extends Phaser.Scene {
+      constructor(){ super('WorldScene'); }
+      create(){
+        this.cameras.main.setBackgroundColor('#11051c');
+        this.worldWidth=2600; this.worldHeight=1800;
+        this.physics.world.setBounds(0,0,this.worldWidth,this.worldHeight);
+        this.cameras.main.setBounds(0,0,this.worldWidth,this.worldHeight);
+        this.makeBackdrop();
+        this.createZones();
+        this.createPlayer();
+        this.createContacts();
+        this.createVehicles();
+        this.createHotspots();
+        this.createTraffic();
+        this.createPedestrians();
+        this.createThugs();
+        this.createPolice();
+        this.createLabels();
+        this.createInput();
+        this.bindUI();
+        this.nearby=null;
+        updateHUD();
+        toast('V2.2 loaded. Police logic fixed.');
+      }
+      makeBackdrop(){
+        const g=this.add.graphics();
+        g.fillStyle(0x20112e,1); g.fillRect(0,0,this.worldWidth,this.worldHeight);
+
+        const blocks=[
+          {x:120,y:120,w:420,h:260,c:0x3d1f52},{x:700,y:90,w:340,h:210,c:0x4a205d},{x:1120,y:120,w:360,h:300,c:0x3a1d48},{x:1580,y:130,w:420,h:240,c:0x4b235f},{x:2060,y:100,w:380,h:280,c:0x3f1e51},
+          {x:180,y:520,w:300,h:300,c:0x3d2152},{x:590,y:470,w:490,h:340,c:0x4a255e},{x:1180,y:520,w:300,h:260,c:0x341841},{x:1600,y:500,w:330,h:330,c:0x442157},{x:2080,y:500,w:260,h:300,c:0x3e214f},
+          {x:170,y:970,w:420,h:260,c:0x3d2254},{x:760,y:960,w:340,h:290,c:0x4a2661},{x:1220,y:960,w:420,h:250,c:0x371944},{x:1710,y:950,w:260,h:320,c:0x422054},{x:2080,y:930,w:280,h:320,c:0x3f1f50}
+        ];
+        blocks.forEach((b, i)=>{
+          g.fillStyle(b.c,1); g.fillRoundedRect(b.x,b.y,b.w,b.h,18); g.lineStyle(2,0x6c3ca0,.45); g.strokeRoundedRect(b.x,b.y,b.w,b.h,18);
+          const neon = [0xff4db8,0x5ef2ff,0xb9ff66,0xffd166][i%4];
+          g.fillStyle(neon, .10); g.fillRect(b.x+12,b.y+12,b.w-24,12);
+          for(let k=0;k<Math.floor(b.w/70);k++){ g.fillStyle(0xf7d7a8,.22); g.fillRect(b.x+18+k*60, b.y+28, 10, 14); }
+          for(let k=0;k<Math.floor(b.w/90);k++){ g.fillStyle(0x6be8ff,.18); g.fillRect(b.x+20+k*80, b.y+b.h-26, 16, 12); }
+        });
+
+        g.fillStyle(0x17101f,1); g.fillRect(0,410,this.worldWidth,82); g.fillRect(0,860,this.worldWidth,88); g.fillRect(0,1310,this.worldWidth,88); g.fillRect(560,0,88,this.worldHeight); g.fillRect(1500,0,88,this.worldHeight); g.fillRect(2050,0,88,this.worldHeight);
+        g.lineStyle(4,0xffd166,.5); [451,904,1354].forEach(y=>{ for(let x=0;x<this.worldWidth;x+=90) g.lineBetween(x,y,x+36,y); }); [604,1544,2094].forEach(x=>{ for(let y=0;y<this.worldHeight;y+=90) g.lineBetween(x,y,x,y+36); });
+
+        g.fillStyle(0x0e3352,1); g.fillRect(0,1550,this.worldWidth,250); g.lineStyle(4,0x5ef2ff,.5); g.lineBetween(0,1548,this.worldWidth,1548);
+        for(let i=0;i<30;i++){ const px=70+i*82; const py=90+(i%3)*9; g.fillStyle(0x0b6d45,1); g.fillCircle(px,py,10); g.fillRect(px-2, py, 4, 22); g.fillStyle(0x5ef2ff,.18); g.fillCircle(px+20,py+20,5); }
+
+        const props = [
+          [340, 418, 0xff4db8], [820, 420, 0x5ef2ff], [1280, 420, 0xffd166], [1840, 420, 0xb9ff66],
+          [420, 866, 0x5ef2ff], [980, 866, 0xff4db8], [1780, 866, 0xffd166], [2270, 866, 0xb9ff66],
+          [760, 1318, 0xff4db8], [1440, 1318, 0x5ef2ff], [2220, 1318, 0xffd166]
+        ];
+        props.forEach(([x,y,c])=>{ g.fillStyle(c,.22); g.fillRoundedRect(x,y,40,14,6); g.fillStyle(c,.4); g.fillRect(x+6,y-20,8,20); });
+
+        for(let i=0;i<7;i++){
+          const x = 250 + i*300;
+          g.fillStyle(0xf7f7f7,.35); g.fillRect(x, 1580, 8, 26); g.fillStyle(0xe0f7ff,.20); g.fillRect(x+10,1587,28,12);
+          g.fillStyle(0xf7f7f7,.35); g.fillRect(x+36, 1580, 8, 26);
+        }
+      }
+      createZones(){ this.zones=[{name:'Sunset Strip',rect:new Phaser.Geom.Rectangle(50,50,520,360)},{name:'Marina Glitz',rect:new Phaser.Geom.Rectangle(640,50,460,320)},{name:'Vice Heights',rect:new Phaser.Geom.Rectangle(1110,50,430,390)},{name:'Dockside',rect:new Phaser.Geom.Rectangle(1530,420,520,430)},{name:'Cypress Flats',rect:new Phaser.Geom.Rectangle(2050,70,500,350)}]; }
+      createLabels(){ const st={fontFamily:'Consolas, monospace',fontSize:'22px',color:'#ffeefc'}; this.add.text(180,90,'SUNSET STRIP',st).setAlpha(.72); this.add.text(720,70,'MARINA GLITZ',st).setAlpha(.72); this.add.text(1170,90,'VICE HEIGHTS',st).setAlpha(.72); this.add.text(1640,450,'DOCKSIDE',st).setAlpha(.72); this.add.text(2130,110,'CYPRESS FLATS',st).setAlpha(.72); this.add.text(60,1580,'ATLANTIC WATER',{...st,fontSize:'18px',color:'#5ef2ff'}).setAlpha(.72); }
+      createPlayer(){ this.player=this.add.container(250,260); const body=this.add.rectangle(0,0,28,28,0xff8d66),shirt=this.add.rectangle(0,2,24,14,0xff8a3d),stripe=this.add.rectangle(0,2,24,4,0x3cb8ff),head=this.add.circle(0,-14,10,0xe9ba8e),hair=this.add.rectangle(0,-20,16,6,0x3a2018),legs=this.add.rectangle(0,14,18,10,0x3259a8); this.player.add([body,shirt,stripe,head,hair,legs]); this.physics.add.existing(this.player); this.player.body.setSize(22,22); this.player.body.setOffset(-11,-11); this.player.body.setCollideWorldBounds(true); this.cameras.main.startFollow(this.player,true,.09,.09); }
+      makeContact(x,y,color,label,key){ const c=this.add.container(x,y); const aura=this.add.circle(0,0,22,color,.16).setBlendMode(Phaser.BlendModes.ADD),body=this.add.rectangle(0,0,18,30,color),head=this.add.circle(0,-20,9,0xf0c49a),name=this.add.text(-46,30,label.toUpperCase(),{fontFamily:'Consolas, monospace',fontSize:'11px',color:'#ffeefc'}).setAlpha(.9); c.add([aura,body,head,name]); this.physics.add.existing(c); c.body.setSize(24,42); c.body.setImmovable(true); c.setData('type','contact'); c.setData('contactKey',key); return c; }
+      createContacts(){ this.contacts=[]; this.contacts.push(this.makeContact(365,250,0xff4db8,'Candy Chrome','candy')); this.contacts.push(this.makeContact(500,335,0xffd166,'Roxie Del Mar','roxie')); this.contacts.push(this.makeContact(935,210,0x5ef2ff,'Eddie Static Vega','eddie')); this.contacts.push(this.makeContact(930,1600,0xff8cc6,'Nina Velez','nina')); this.contacts.push(this.makeContact(1295,250,0xb9ff66,'Vincent Silk Carbone','silk')); }
+      createVehicles(){ this.vehicles=[]; this.vehicles.push(this.makeVehicle(760,230,0xd94d4d,'Vice Muscle',250)); this.vehicles.push(this.makeVehicle(1700,620,0x5ef2ff,'Neon Coupe',230)); this.vehicles.push(this.makeVehicle(2180,210,0xffd166,'Palm Lux',245)); }
+      makeVehicle(x,y,color,label,speed){ const car=this.add.container(x,y); const shell=this.add.rectangle(0,0,76,38,color).setStrokeStyle(2,0xffffff,.18),roof=this.add.rectangle(0,0,44,22,0xf59fb3),glass=this.add.rectangle(0,0,28,12,0x6be8ff,.8),w1=this.add.circle(-24,-18,8,0x111111),w2=this.add.circle(24,-18,8,0x111111),w3=this.add.circle(-24,18,8,0x111111),w4=this.add.circle(24,18,8,0x111111); car.add([w1,w2,w3,w4,shell,roof,glass]); this.physics.add.existing(car); car.body.setSize(70,32); car.body.setCollideWorldBounds(true); car.setData('type','vehicle'); car.setData('label',label); car.setData('speed',speed); return car; }
+      createHotspots(){ this.hotspots=[]; const a=this.add.circle(460,580,16,0xff4db8,.8).setStrokeStyle(2,0xffffff,.25); this.tweens.add({targets:a,alpha:.35,yoyo:true,repeat:-1,duration:700}); this.physics.add.existing(a); a.body.setCircle(16); a.body.setOffset(-16,-16); a.setData('type','hotspot'); a.setData('hotspotKey','club-envelope'); this.hotspots.push(a); const b=this.add.circle(1040,1600,16,0x5ef2ff,.85).setStrokeStyle(2,0xffffff,.25); this.tweens.add({targets:b,scale:1.18,yoyo:true,repeat:-1,duration:600}); this.physics.add.existing(b); b.body.setCircle(16); b.body.setOffset(-16,-16); b.setData('type','hotspot'); b.setData('hotspotKey','marina-stash'); this.hotspots.push(b); const c=this.add.circle(1290,520,16,0xb9ff66,.85).setStrokeStyle(2,0xffffff,.25); this.tweens.add({targets:c,alpha:.28,yoyo:true,repeat:-1,duration:550}); this.physics.add.existing(c); c.body.setCircle(16); c.body.setOffset(-16,-16); c.setData('type','hotspot'); c.setData('hotspotKey','silk-drop'); this.hotspots.push(c); }
+      createTraffic(){ this.traffic=[]; const lanes=[{x:200,y:451,dir:'right'},{x:2400,y:451,dir:'left'},{x:200,y:904,dir:'right'},{x:2400,y:1354,dir:'left'},{x:604,y:170,dir:'down'},{x:1544,y:1500,dir:'up'},{x:2094,y:170,dir:'down'}]; lanes.forEach((lane,i)=>{ for(let j=0;j<3;j++){ const t=this.add.rectangle(lane.x+(lane.dir==='right'?-j*260:lane.dir==='left'?j*260:0),lane.y+(lane.dir==='down'?-j*260:lane.dir==='up'?j*260:0),38,20,[0xff4db8,0x5ef2ff,0xffd166,0xb9ff66][(i+j)%4]).setStrokeStyle(2,0xffffff,.15); if(lane.dir==='up'||lane.dir==='down') t.rotation=Math.PI/2; this.physics.add.existing(t); t.body.setImmovable(true); t.setData('type','traffic'); t.setData('lane',lane); this.traffic.push(t); } }); }
+      createPedestrians(){ this.pedestrians=[]; for(let i=0;i<16;i++){ const x=220+Math.random()*2100,y=180+Math.random()*1200; const p=this.add.container(x,y); const body=this.add.rectangle(0,0,12,20,[0xff4db8,0x5ef2ff,0xffd166,0xb9ff66][i%4]),head=this.add.circle(0,-14,6,0xf0c49a); p.add([body,head]); this.physics.add.existing(p); p.body.setSize(16,28); p.body.setCollideWorldBounds(true); p.setData('type','ped'); p.setData('dirTimer',randomInt(20,120)); p.setData('vx',0); p.setData('vy',0); this.pedestrians.push(p); } }
+      createThugs(){ this.thugs=[]; const spots=[[1680,620],[1780,720],[2160,240],[2270,300],[1360,600]]; spots.forEach((s,idx)=>{ const t=this.add.container(s[0],s[1]); const body=this.add.rectangle(0,0,18,28,idx%2?0x74354f:0x3b6ea8),head=this.add.circle(0,-18,8,0xf0c49a); t.add([body,head]); this.physics.add.existing(t); t.body.setSize(18,30); t.body.setCollideWorldBounds(true); t.setData('type','thug'); t.setData('hp',30); t.setData('aggro',false); this.thugs.push(t); }); this.bullets=this.physics.add.group(); }
+      createPolice(){ this.police=[]; const spawns=[[1760,1100],[1880,740]]; for(let i=0;i<2;i++){ const p=this.add.container(spawns[i][0],spawns[i][1]); const body=this.add.rectangle(0,0,66,34,0xf7f7f7).setStrokeStyle(2,0x7aa8ff,.35),stripe=this.add.rectangle(0,0,66,6,0x2d59c9),light=this.add.rectangle(0,-10,28,6,i%2?0xff5d73:0x5ef2ff),w1=this.add.circle(-22,-16,8,0x111111),w2=this.add.circle(22,-16,8,0x111111),w3=this.add.circle(-22,16,8,0x111111),w4=this.add.circle(22,16,8,0x111111); p.add([w1,w2,w3,w4,body,stripe,light]); this.physics.add.existing(p); p.body.setSize(60,28); p.setData('homeX', spawns[i][0]); p.setData('homeY', spawns[i][1]); this.police.push(p); } }
+      resetPolicePositions(){ this.police.forEach((p, i)=>{ p.x = p.getData('homeX'); p.y = p.getData('homeY'); p.body.setVelocity(0,0); }); }
+      createInput(){ this.keys=this.input.keyboard.addKeys({up:Phaser.Input.Keyboard.KeyCodes.W,down:Phaser.Input.Keyboard.KeyCodes.S,left:Phaser.Input.Keyboard.KeyCodes.A,right:Phaser.Input.Keyboard.KeyCodes.D,up2:Phaser.Input.Keyboard.KeyCodes.UP,down2:Phaser.Input.Keyboard.KeyCodes.DOWN,left2:Phaser.Input.Keyboard.KeyCodes.LEFT,right2:Phaser.Input.Keyboard.KeyCodes.RIGHT,action:Phaser.Input.Keyboard.KeyCodes.E,phone:Phaser.Input.Keyboard.KeyCodes.Q,info:Phaser.Input.Keyboard.KeyCodes.TAB,exit:Phaser.Input.Keyboard.KeyCodes.F,attack:Phaser.Input.Keyboard.KeyCodes.SPACE}); this.input.keyboard.on('keydown-E',()=>this.handleAction()); this.input.keyboard.on('keydown-Q',()=>{ if(ui.phone.classList.contains('show')) closePhone(); else openPhone(this); }); this.input.keyboard.on('keydown-TAB',e=>{ e.preventDefault(); if(ui.intel.classList.contains('show')) closeIntel(); else openIntel(); }); this.input.keyboard.on('keydown-F',()=>this.tryExitVehicle()); this.input.keyboard.on('keydown-SPACE',()=>this.attack()); this.touchState={x:0,y:0}; this.bindTouchControls(); }
+      bindTouchControls(){ const stick=document.getElementById('stick'), knob=document.getElementById('knob'); let dragging=false; const updateStick=client=>{ const rect=stick.getBoundingClientRect(), cx=rect.left+rect.width/2, cy=rect.top+rect.height/2, dx=client.clientX-cx, dy=client.clientY-cy, len=Math.min(Math.hypot(dx,dy),38), angle=Math.atan2(dy,dx), x=Math.cos(angle)*len, y=Math.sin(angle)*len; knob.style.left=`${39+x}px`; knob.style.top=`${39+y}px`; this.touchState.x=x/38; this.touchState.y=y/38; }; const reset=()=>{ dragging=false; knob.style.left='39px'; knob.style.top='39px'; this.touchState.x=0; this.touchState.y=0; }; stick.addEventListener('pointerdown',e=>{ dragging=true; updateStick(e); }); window.addEventListener('pointermove',e=>{ if(dragging) updateStick(e); }); window.addEventListener('pointerup',reset); window.addEventListener('pointercancel',reset); document.getElementById('touch-action').onclick=()=>this.handleAction(); document.getElementById('touch-attack').onclick=()=>this.attack(); document.getElementById('touch-phone').onclick=()=>{ if(ui.phone.classList.contains('show')) closePhone(); else openPhone(this); }; document.getElementById('touch-map').onclick=()=>{ if(ui.intel.classList.contains('show')) closeIntel(); else openIntel(); }; }
+      bindUI(){ document.getElementById('intel-phone').onclick=()=>{ closeIntel(); if(ui.phone.classList.contains('show')) closePhone(); else openPhone(this); }; document.getElementById('intel-close').onclick=closeIntel; }
+      update(){ if(state.policeCooldown>0) state.policeCooldown--; if(state.policeLockTimer>0) state.policeLockTimer--; if(state.policeIgnoreTimer>0) state.policeIgnoreTimer--; if(state.policeDroppedTimer>0) state.policeDroppedTimer--; if(state.damageCooldown>0) state.damageCooldown--; if(ui.dialogue.classList.contains('show')||ui.phone.classList.contains('show')||ui.intel.classList.contains('show')){ this.setVelocity(0,0); return; } let mx=0,my=0; const kbLeft=this.keys.left.isDown||this.keys.left2.isDown, kbRight=this.keys.right.isDown||this.keys.right2.isDown, kbUp=this.keys.up.isDown||this.keys.up2.isDown, kbDown=this.keys.down.isDown||this.keys.down2.isDown; if(kbLeft) mx-=1; if(kbRight) mx+=1; if(kbUp) my-=1; if(kbDown) my+=1; mx+=this.touchState.x; my+=this.touchState.y; const len=Math.hypot(mx,my)||1; mx/=len; my/=len; const speed=state.inVehicle?(state.vehicle?.speed||250):155; this.setVelocity(mx*speed,my*speed); if(state.inVehicle&&this.activeVehicle&&Math.abs(mx)+Math.abs(my)>0.1) this.activeVehicle.rotation=Phaser.Math.Angle.Between(0,0,mx,my); this.updateDistrict(); this.updateNearbyHint(); this.updateTraffic(); this.updatePedestrians(); this.updateThugs(); this.updatePolice(); if(state.health<=0) this.hospitalize(); }
+      setVelocity(vx,vy){ if(state.inVehicle&&this.activeVehicle){ this.activeVehicle.body.setVelocity(vx,vy); this.player.x=this.activeVehicle.x; this.player.y=this.activeVehicle.y; } else { this.player.body.setVelocity(vx,vy); } }
+      updateDistrict(){ const target=state.inVehicle&&this.activeVehicle?this.activeVehicle:this.player; const point=new Phaser.Geom.Point(target.x,target.y); for(const zone of this.zones){ if(Phaser.Geom.Rectangle.ContainsPoint(zone.rect,point)){ if(state.district!==zone.name){ state.district=zone.name; toast(`Entered ${zone.name}`); updateHUD(); } return; } } }
+      updateNearbyHint(){ const target=state.inVehicle&&this.activeVehicle?this.activeVehicle:this.player; let nearest=null,best=99999; const all=[...this.contacts,...this.vehicles,...this.hotspots]; all.forEach(obj=>{ if(state.inVehicle&&obj===this.activeVehicle) return; const d=dist(target,obj); if(d<best&&d<74){ best=d; nearest=obj; } }); this.nearby=nearest; if(!nearest) state.hint=state.inVehicle?'Drive with WASD / arrows. F exits. Space honks violence.':'Move with WASD / arrows. E interacts. Space punches/shoots.'; else if(nearest.getData('type')==='contact') state.hint=`Tap E to talk to ${nearest.getData('contactKey').toUpperCase()}.`; else if(nearest.getData('type')==='vehicle') state.hint='Tap E to steal the vehicle.'; else if(nearest.getData('type')==='hotspot') state.hint='Tap E to trigger the hotspot.'; updateHUD(); }
+      updateTraffic(){ this.traffic.forEach(t=>{ const lane=t.getData('lane'); if(lane.dir==='right'){ t.x+=1.3; if(t.x>this.worldWidth+50) t.x=-50; } else if(lane.dir==='left'){ t.x-=1.3; if(t.x<-50) t.x=this.worldWidth+50; } else if(lane.dir==='down'){ t.y+=1.2; if(t.y>this.worldHeight+50) t.y=-50; } else if(lane.dir==='up'){ t.y-=1.2; if(t.y<-50) t.y=this.worldHeight+50; } const target=state.inVehicle&&this.activeVehicle?this.activeVehicle:this.player; if(dist(t,target)<34&&state.damageCooldown<=0){ state.health=Math.max(1,state.health-8); state.heat=Math.min(5,state.heat+1); state.policeLockTimer = Math.max(state.policeLockTimer, 420); state.damageCooldown=60; toast('Traffic clipped you.'); updateHUD(); } }); }
+      updatePedestrians(){ this.pedestrians.forEach(p=>{ let timer=p.getData('dirTimer')-1; if(timer<=0){ timer=randomInt(30,150); p.setData('vx',randomInt(-25,25)); p.setData('vy',randomInt(-25,25)); } p.setData('dirTimer',timer); p.body.setVelocity(p.getData('vx'),p.getData('vy')); const target=state.inVehicle&&this.activeVehicle?this.activeVehicle:this.player; if(dist(p,target)<26&&state.inVehicle&&state.damageCooldown<=0){ state.heat=Math.min(5,state.heat+1); state.policeLockTimer = Math.max(state.policeLockTimer, 420); state.damageCooldown=40; toast('Pedestrians are bad for public image.'); updateHUD(); } }); }
+      updateThugs(){ const target=state.inVehicle&&this.activeVehicle?this.activeVehicle:this.player; this.thugs.forEach(t=>{ if(!t.active) return; const d=dist(t,target); if(d<180) t.setData('aggro',true); if(t.getData('aggro')){ this.physics.moveToObject(t,target,65); if(d<26&&state.damageCooldown<=0){ state.health=Math.max(1,state.health-10); state.damageCooldown=50; toast('A thug got hands on you.'); updateHUD(); } } else t.body.setVelocity(0,0); }); this.bullets.children.each(b=>{ if(!b.active) return; this.thugs.forEach(t=>{ if(t.active&&dist(b,t)<18){ b.destroy(); const hp=t.getData('hp')-18; t.setData('hp',hp); if(hp<=0){ t.destroy(); state.cash+=120; state.thugsDropped+=1; state.control[state.district]=Math.min(100,(state.control[state.district]||0)+4); toast('Thug dropped.'); updateHUD(); if(state.thugsDropped===3){ state.unlocked.silk=true; toast('Word reached Silk.'); } } } }); }); }
+      updatePolice(){
+        const target=state.inVehicle&&this.activeVehicle?this.activeVehicle:this.player;
+        if(state.policeIgnoreTimer>0 || state.heat<=0){
+          this.police.forEach(p=>{ const home={x:p.getData('homeX'), y:p.getData('homeY')}; if(dist(p,home)>12) this.physics.moveToObject(p,home,110); else p.body.setVelocity(0,0); });
+          return;
+        }
+        const pursuitActive = state.policeLockTimer > 0 || state.heat >= 3;
+        this.police.forEach((p,idx)=>{
+          if(!pursuitActive && dist(p,target) > 420){ const home={x:p.getData('homeX'), y:p.getData('homeY')}; if(dist(p,home)>12) this.physics.moveToObject(p,home,110); else p.body.setVelocity(0,0); return; }
+          this.physics.moveToObject(p,target,90+state.heat*24+idx*6);
+          const d = dist(p,target);
+          if(d<110 && Math.random()<0.006*state.heat && state.policeIgnoreTimer<=0) policeEncounter(this,'ongoing heat');
+          if(d>560 && state.policeLockTimer<=0 && state.heat<3){ dropPolice(this,'You got far enough away.'); }
+        });
+      }
+      hospitalize(){ state.health=70; state.cash=Math.max(0,state.cash-180); state.heat=Math.max(0,state.heat-2); state.policeLockTimer=0; state.policeIgnoreTimer=480; this.player.x=300; this.player.y=300; if(this.activeVehicle){ this.activeVehicle.body.setVelocity(0,0); } this.resetPolicePositions(); toast('County Hospital patched you up.'); updateHUD(); }
+      tryExitVehicle(){ if(!state.inVehicle||!this.activeVehicle) return; state.inVehicle=false; this.player.setVisible(true); this.player.body.enable=true; this.player.x=this.activeVehicle.x+36; this.player.y=this.activeVehicle.y+10; this.activeVehicle.body.setVelocity(0,0); state.hint='You stepped out. Tap E to hijack another terrible idea.'; updateHUD(); toast('Exited vehicle.'); }
+      attack(){ if(ui.dialogue.classList.contains('show')||ui.phone.classList.contains('show')||ui.intel.classList.contains('show')) return; const source=state.inVehicle&&this.activeVehicle?this.activeVehicle:this.player; if(state.inVehicle){ state.heat=Math.min(5,state.heat+1); state.policeLockTimer = Math.max(state.policeLockTimer, 480); toast('You leaned on the horn and looked violent.'); updateHUD(); return; } const bullet=this.add.circle(source.x,source.y,5,0xffd166); this.physics.add.existing(bullet); const pointer=this.input.activePointer; const wp=this.cameras.main.getWorldPoint(pointer.x||this.cameras.main.width/2,pointer.y||this.cameras.main.height/2); const angle=Phaser.Math.Angle.Between(source.x,source.y,wp.x,wp.y); bullet.body.setVelocity(Math.cos(angle)*300,Math.sin(angle)*300); this.bullets.add(bullet); state.heat=Math.min(5,state.heat+1); state.policeLockTimer = Math.max(state.policeLockTimer, 480); updateHUD(); this.time.delayedCall(900,()=>{ if(bullet.active) bullet.destroy(); }); }
+      handleAction(){ if(ui.dialogue.classList.contains('show')||ui.phone.classList.contains('show')||ui.intel.classList.contains('show')) return; const obj=this.nearby; if(!obj) return; const type=obj.getData('type'); if(type==='vehicle'){ state.inVehicle=true; this.activeVehicle=obj; state.vehicle={label:obj.getData('label'),speed:obj.getData('speed')}; obj.x=this.player.x; obj.y=this.player.y; this.player.setVisible(false); this.player.body.enable=false; toast(`You stole the ${state.vehicle.label}.`); updateHUD(); return; } if(type==='contact'){ this.interact(obj.getData('contactKey')); return; } if(type==='hotspot'){ this.triggerHotspot(obj.getData('hotspotKey'),obj); } }
+      interact(key){
+        if(key==='candy'){
+          if(!state.mission.active){ openDialogue(CONTACTS.candy,CONTACTS.candy.intro,[{label:'Take envelope job',variant:'good',onClick:()=>{ state.mission.active='Recover the Envelope'; state.mission.step=1; state.objective='Grab the envelope from the pink hotspot and return to Candy.'; state.loyalty.candy+=1; updateHUD(); toast('Candy hired you.'); }},{label:'Need a minute',variant:'dark',onClick:()=>toast('Candy hates hesitation.')}]); }
+          else if(state.mission.active==='Recover the Envelope'&&state.mission.step===2){ openDialogue(CONTACTS.candy,'You actually delivered. Wonderful. I hate being pleasantly surprised.',[{label:'Get paid',variant:'good',onClick:()=>{ state.cash+=1250; state.mission.completed.push('Recover the Envelope'); state.mission.active='Promoter Pressure'; state.mission.step=0; state.objective='Call Eddie or push deeper into the city. Marina work is opening up.'; state.loyalty.candy+=2; state.unlocked.marina=true; toast('Candy paid $1,250. Marina unlocked.'); updateHUD(); }}]); }
+          else { openDialogue(CONTACTS.candy,'The envelope is still out there. Kindly stop wasting both our time.',[{label:'Understood',variant:'secondary',onClick:()=>{}}]); }
+        }
+        if(key==='roxie'){ openDialogue(CONTACTS.roxie,CONTACTS.roxie.intro,[{label:'Buy gossip ($90)',variant:'good',onClick:()=>{ if(state.cash<90){ toast('Roxie does not finance rumors.'); return; } state.cash-=90; state.loyalty.roxie+=1; state.hint='Roxie says the south strip is soft right now. Cops are asleep or drunk.'; toast('Roxie sold gossip.'); updateHUD(); }},{label:'After-hours ride ($180)',variant:'warn',onClick:async()=>{ if(state.cash<180){ toast('Roxie is not running a charity.'); return; } state.cash-=180; updateHUD(); await this.playEscortScene('Roxie Del Mar','🚗'); const r=Math.random(); if(r<.33){ state.heat=Math.max(0,state.heat-1); dropPolice(this,'You emerged calmer and less arrestable.'); } else if(r<.66){ state.cash+=110; toast('Roxie handed you a useful lead.'); } else { state.heat=Math.min(5,state.heat+1); state.policeLockTimer = Math.max(state.policeLockTimer, 360); toast('A patrol noticed the suspension.'); policeEncounter(this,'a parked bad decision'); } updateHUD(); }}]); }
+        if(key==='eddie'){ openDialogue(CONTACTS.eddie,CONTACTS.eddie.intro,[{label:'Buy hot tip ($110)',variant:'good',onClick:()=>{ if(state.cash<110){ toast('Static hangs up on poor people.'); return; } state.cash-=110; state.loyalty.eddie+=1; state.cash+=180; state.objective='Eddie says the marina stash is live. Drive east and go south to the water.'; state.hint='The glowing cyan ring at the marina is worth checking.'; toast('Static sold a hot lead.'); updateHUD(); }},{label:'Ask for a cleaner street',variant:'secondary',onClick:()=>{ dropPolice(this,'Eddie jammed the radio chatter for a while.'); }}]); }
+        if(key==='nina'){ openDialogue(CONTACTS.nina,CONTACTS.nina.intro,[{label:'Need smuggler work',variant:'good',onClick:()=>{ if(!state.vehicle){ toast('Nina wants you mobile. Steal a ride first.'); return; } state.cash+=260; state.loyalty.nina+=1; state.objective='Nina wants a future run from the marina to the city. More to come.'; toast('Nina paid a scouting fee.'); updateHUD(); }},{label:'See the marina',variant:'secondary',onClick:()=>{ state.hint='Down by the waterline is where morals go to drown.'; updateHUD(); }}]); }
+        if(key==='silk'){ openDialogue(CONTACTS.silk,CONTACTS.silk.intro,[{label:'Offer services',variant:'good',onClick:()=>{ state.cash+=520; state.loyalty.silk+=1; state.control['Vice Heights']=Math.min(100,state.control['Vice Heights']+8); state.objective='Silk wants leverage in Vice Heights. Drop a thug or make money up here.'; toast('Silk paid a courtesy fee.'); updateHUD(); }},{label:'Back away respectfully',variant:'dark',onClick:()=>toast('Silk remembers manners.')}]); }
+      }
+      async playEscortScene(name,icon){ const overlay=document.createElement('div'); overlay.style.position='fixed'; overlay.style.inset='0'; overlay.style.display='flex'; overlay.style.alignItems='center'; overlay.style.justifyContent='center'; overlay.style.background='rgba(0,0,0,.82)'; overlay.style.zIndex='80'; overlay.innerHTML=`<div style="width:min(560px,calc(100vw - 24px));padding:18px;text-align:center;background:linear-gradient(180deg,rgba(42,18,66,.98),rgba(20,8,34,.98));border:1px solid rgba(127,60,183,.95);border-radius:18px;box-shadow:0 10px 28px rgba(0,0,0,.35)"><div style="font-size:24px;font-weight:900;letter-spacing:.08em;text-transform:uppercase">${name}</div><div style="margin-top:10px;color:#d4a8cf">The city pretends not to notice.</div><div id="escort-car" style="font-size:84px;display:inline-block;margin-top:16px">${icon}</div><div style="margin-top:14px;font-size:18px;font-weight:800;color:#ffd166">THE CAR ROCKS LIKE A BAD DECISION</div></div>`; document.body.appendChild(overlay); const car=overlay.querySelector('#escort-car'); const start=performance.now(); function shake(now){ const t=(now-start)/90; car.style.transform=`translate(${Math.sin(t*1.9)*3}px, ${Math.cos(t*2.1)*2}px)`; if(now-start<3000) requestAnimationFrame(shake); } requestAnimationFrame(shake); await new Promise(r=>setTimeout(r,3000)); overlay.remove(); }
+      triggerHotspot(key,obj){ if(key==='club-envelope'){ if(state.mission.active!=='Recover the Envelope'||state.mission.step!==1){ toast('Interesting place, wrong time.'); return; } state.mission.step=2; state.cash+=220; state.heat=Math.min(5,state.heat+1); state.policeLockTimer = Math.max(state.policeLockTimer, 360); state.objective='Return the envelope to Candy Chrome.'; state.hint='Head back to Sunset Strip and try not to look guilty.'; obj.destroy(); toast('Envelope grabbed. Heat up.'); updateHUD(); policeEncounter(this,'lifting a nightclub envelope'); return; } if(key==='marina-stash'){ state.cash+=380; state.secrets+=1; state.control['Marina Glitz']=Math.min(100,state.control['Marina Glitz']+10); state.heat=Math.min(5,state.heat+(Math.random()<0.5?1:0)); state.policeLockTimer = Math.max(state.policeLockTimer, 300); state.objective='You found a marina stash. Nina and Eddie will both care.'; state.hint='This city rewards greed right up until it doesn’t.'; obj.setAlpha(.2); toast('Marina stash secured.'); updateHUD(); if(state.heat>0&&Math.random()<0.5) policeEncounter(this,'a marina cash pickup'); return; } if(key==='silk-drop'){ state.cash+=620; state.control['Vice Heights']=Math.min(100,state.control['Vice Heights']+12); state.heat=Math.min(5,state.heat+1); state.policeLockTimer = Math.max(state.policeLockTimer, 360); state.objective='You disturbed Vice Heights. Silk will remember that.'; obj.setAlpha(.2); toast('Vice Heights payoff acquired.'); updateHUD(); policeEncounter(this,'a rich neighborhood score'); } }
+    }
+
+    try {
+      const game = new Phaser.Game({ type: Phaser.AUTO, parent: 'phaser-root', backgroundColor: '#090212', scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH, width: window.innerWidth, height: worldHeightSafe() }, physics: { default: 'arcade', arcade: { debug: false } }, scene: [BootScene, WorldScene] });
+      window.addEventListener('resize', () => { try { game.scale.resize(window.innerWidth, worldHeightSafe()); } catch(e) {} });
+      updateHUD();
+    } catch (e) { showFatal(e.message || e); }
+  </script>
+</body>
+</html>
