@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <title>Vice Districts 2D</title>
+  <style>
+    :root {
+      --bg: #090212;
+      --panel: rgba(20, 8, 34, 0.92);
+      --panel-2: rgba(35, 14, 56, 0.95);
+      --text: #ffeefc;
+      --muted: #d4a8cf;
+      --hot: #ff4db8;
+      --cyan: #5ef2ff;
+      --lime: #b9ff66;
+      --warn: #ffd166;
+      --danger: #ff5d73;
+      --good: #79ffb0;
+      --border: rgba(127, 60, 183, 0.95);
+      --shadow: rgba(0, 0, 0, 0.38);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background:
+        radial-gradient(circle at top right, rgba(255, 77, 184, 0.16), transparent 30%),
+        radial-gradient(circle at bottom left, rgba(94, 242, 255, 0.12), transparent 28%),
+        linear-gradient(180deg, #0b0314, var(--bg));
+      color: var(--text);
+      font-family: Consolas, Monaco, "Courier New", monospace;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #game-shell {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    #topbar {
+      position: relative;
+      z-index: 20;
+      padding: 10px 12px 8px;
+      background: linear-gradient(180deg, rgba(10, 4, 18, 0.95), rgba(10, 4, 18, 0.75));
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      backdrop-filter: blur(6px);
+    }
+
+    #brand {
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 20px;
+      color: var(--text);
+      text-shadow: 0 0 16px rgba(255, 77, 184, 0.35);
+    }
+
+    #status-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .pill {
+      padding: 6px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    #phaser-root {
+      position: relative;
+      width: 100vw;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    #message-strip {
+      position: relative;
+      z-index: 20;
+      padding: 10px 12px calc(10px + var(--safe-bottom));
+      background: linear-gradient(180deg, rgba(10, 4, 18, 0.75), rgba(10, 4, 18, 0.96));
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    #objective {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    #action-hint {
+      font-size: 13px;
+      color: var(--text);
+      min-height: 20px;
+    }
+
+    #overlay-ui {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    #dialogue,
+    #phone,
+    #pause-card,
+    #toast {
+      pointer-events: auto;
+    }
+
+    #dialogue {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: calc(90px + var(--safe-bottom));
+      display: none;
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 14px 34px var(--shadow);
+      overflow: hidden;
+    }
+
+    #dialogue.show { display: block; }
+
+    #dialogue-inner {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    #portrait {
+      width: 96px;
+      height: 96px;
+      border-radius: 14px;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.05);
+    }
+
+    #dialogue-name {
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    #dialogue-role {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    #dialogue-text {
+      font-size: 13px;
+      line-height: 1.45;
+      min-height: 72px;
+    }
+
+    #dialogue-actions {
+      display: grid;
+      gap: 8px;
+      padding: 0 12px 12px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 10px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      color: white;
+      background: linear-gradient(180deg, #ff4db8, #b62a7d);
+      box-shadow: 0 8px 18px rgba(255,77,184,0.22);
+      cursor: pointer;
+    }
+
+    .btn.secondary { background: linear-gradient(180deg, #5ef2ff, #258eac); }
+    .btn.good { background: linear-gradient(180deg, #79ffb0, #2d9f61); }
+    .btn.warn { background: linear-gradient(180deg, #ffd166, #c08a18); }
+    .btn.dark { background: linear-gradient(180deg, #56316f, #2a1638); box-shadow: none; }
+
+    #phone {
+      position: absolute;
+      top: 82px;
+      right: 12px;
+      width: min(320px, calc(100vw - 24px));
+      display: none;
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 14px 34px var(--shadow);
+    }
+
+    #phone.show { display: block; }
+
+    #phone-head {
+      padding: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 13px;
+    }
+
+    #phone-body {
+      max-height: 55vh;
+      overflow: auto;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .contact-row {
+      display: grid;
+      grid-template-columns: 44px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .contact-row img {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .contact-name {
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .contact-sub {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .mini-btn {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(180deg, #5ef2ff, #258eac);
+      color: white;
+      font-weight: 800;
+      font-size: 11px;
+    }
+
+    #touch-controls {
+      position: absolute;
+      inset: auto 0 0 0;
+      display: none;
+      pointer-events: none;
+      padding: 0 12px calc(82px + var(--safe-bottom));
+    }
+
+    #stick,
+    #buttons {
+      pointer-events: auto;
+    }
+
+    #controls-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    #stick {
+      width: 132px;
+      height: 132px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      position: relative;
+      touch-action: none;
+      backdrop-filter: blur(4px);
+    }
+
+    #knob {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.3), rgba(255,255,255,0.12));
+      border: 1px solid rgba(255,255,255,0.18);
+      position: absolute;
+      left: 39px;
+      top: 39px;
+      box-shadow: 0 10px 18px rgba(0,0,0,0.25);
+    }
+
+    #buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 68px);
+      gap: 10px;
+    }
+
+    .touch-btn {
+      width: 68px;
+      height: 68px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.08);
+      color: white;
+      font-weight: 900;
+      font-size: 12px;
+      backdrop-filter: blur(4px);
+    }
+
+    #toast {
+      position: absolute;
+      top: 76px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-12px);
+      background: rgba(8,2,14,0.94);
+      border: 1px solid rgba(94,242,255,0.45);
+      padding: 10px 14px;
+      border-radius: 999px;
+      color: var(--text);
+      opacity: 0;
+      transition: opacity .25s ease, transform .25s ease;
+      box-shadow: 0 10px 22px rgba(0,0,0,0.35);
+      white-space: nowrap;
+      max-width: calc(100vw - 24px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #pause-card {
+      position: absolute;
+      top: 82px;
+      left: 12px;
+      display: none;
+      width: min(330px, calc(100vw - 24px));
+      background: linear-gradient(180deg, var(--panel-2), var(--panel));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 14px 34px var(--shadow);
+      padding: 12px;
+    }
+
+    #pause-card.show { display: block; }
+
+    #pause-card h3 {
+      margin: 0 0 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 13px;
+    }
+
+    #pause-card .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    #pause-card .line {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    @media (max-width: 900px) {
+      #touch-controls { display: block; }
+      #dialogue-inner { grid-template-columns: 76px 1fr; }
+      #portrait { width: 76px; height: 76px; }
+    }
+
+    @keyframes shine {
+      from { left: -100%; }
+      to { left: 120%; }
+    }
+
+    @keyframes ticker {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+
+    @keyframes heatPulse {
+      0%,100% { filter: drop-shadow(0 0 0 transparent); }
+      50% { filter: drop-shadow(0 0 8px rgba(255,93,115,0.35)); }
+    }
+
+    @keyframes driveAcross {
+      from { left: -45px; }
+      to { left: calc(100% + 20px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-shell">
+    <div id="topbar">
+      <div id="brand">Vice Districts 2D</div>
+      <div id="status-line">
+        <div class="pill" id="hud-cash">Cash: $0</div>
+        <div class="pill" id="hud-heat">Heat: ☆ ☆ ☆ ☆ ☆</div>
+        <div class="pill" id="hud-district">District: Sunset Strip</div>
+        <div class="pill" id="hud-vehicle">Ride: On Foot</div>
+      </div>
+    </div>
+
+    <div id="phaser-root"></div>
+
+    <div id="message-strip">
+      <div id="objective">Objective: Walk to Candy Chrome and get your first job.</div>
+      <div id="action-hint">Move with WASD / arrows. Tap E near a contact, car, or glowing hotspot.</div>
+    </div>
+  </div>
+
+  <div id="overlay-ui">
+    <div id="toast"></div>
+
+    <div id="dialogue">
+      <div id="dialogue-inner">
+        <img id="portrait" alt="portrait" />
+        <div>
+          <div id="dialogue-name"></div>
+          <div id="dialogue-role"></div>
+          <div id="dialogue-text"></div>
+        </div>
+      </div>
+      <div id="dialogue-actions"></div>
+    </div>
+
+    <div id="phone">
+      <div id="phone-head">VicePhone</div>
+      <div id="phone-body"></div>
+    </div>
+
+    <div id="pause-card">
+      <h3>Street Intel</h3>
+      <div class="line" id="intel-line-1"></div>
+      <div class="line" id="intel-line-2"></div>
+      <div class="line" id="intel-line-3"></div>
+      <div class="grid">
+        <button class="btn secondary" id="btn-phone">Phone</button>
+        <button class="btn dark" id="btn-close-pause">Close</button>
+      </div>
+    </div>
+
+    <div id="touch-controls">
+      <div id="controls-row">
+        <div id="stick">
+          <div id="knob"></div>
+        </div>
+        <div id="buttons">
+          <button class="touch-btn" id="touch-action">ACT</button>
+          <button class="touch-btn" id="touch-phone">CALL</button>
+          <button class="touch-btn" id="touch-map">INFO</button>
+          <button class="touch-btn" id="touch-exit">EXIT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+  <script>
+    const CHAR_PATH = 'assets/characters/';
+
+    const PORTRAITS = {
+      tommy: CHAR_PATH + 'tommy-drift-malone.png',
+      candy: CHAR_PATH + 'candy-chrome.png',
+      roxie: CHAR_PATH + 'roxie-del-mar.png',
+      nina: CHAR_PATH + 'nina-velez.png',
+      vivienne: CHAR_PATH + 'vivienne-cross.png',
+      eddie: CHAR_PATH + 'eddie-static-vega.png',
+      silk: CHAR_PATH + 'vincent-silk-carbone.png',
+      lucho: CHAR_PATH + 'big-lucho-herrera.png',
+      marco: CHAR_PATH + 'marco-reyes.png',
+      chrome: CHAR_PATH + 'rick-chrome-dalton.png',
+      hammer: CHAR_PATH + 'blake-hammer-voss.png',
+      duke: CHAR_PATH + 'duke-rawlins.png'
+    };
+
+    const CONTACTS = {
+      candy: {
+        key: 'candy',
+        name: 'Candy Chrome',
+        role: 'Nightclub fixer',
+        portrait: PORTRAITS.candy,
+        lines: {
+          intro: 'Sweetheart, Vice City runs on weak men, loud music, and late payments. Lucky for you, I know where all three live.',
+          mission: 'A promoter left an envelope in the back office. Get it before sunrise and maybe I stop calling you decorative.',
+          complete: 'You actually delivered. Wonderful. I hate being pleasantly surprised.'
+        }
+      },
+      roxie: {
+        key: 'roxie',
+        name: 'Roxie Del Mar',
+        role: 'Gossip broker',
+        portrait: PORTRAITS.roxie,
+        lines: {
+          intro: 'The city talks after midnight. I just invoice by the hour.',
+          gossip: 'Police are lazy on the south strip tonight. If you were a worse person, that might be useful.'
+        }
+      },
+      eddie: {
+        key: 'eddie',
+        name: 'Eddie "Static" Vega',
+        role: 'Fixer / info broker',
+        portrait: PORTRAITS.eddie,
+        lines: {
+          intro: 'You do not find jobs, kid. Jobs find me, crawl into my phone, and beg for representation.',
+          tip: 'Fast cash at the marina. Fast enough to be suspicious, which is how you know it is real.'
+        }
+      },
+      nina: {
+        key: 'nina',
+        name: 'Nina Velez',
+        role: 'Yacht smuggler liaison',
+        portrait: PORTRAITS.nina,
+        lines: {
+          intro: 'Out on the water, nobody hears a conscience anyway.'
+        }
+      }
+    };
+
+    const state = {
+      cash: 850,
+      heat: 0,
+      district: 'Sunset Strip',
+      objective: 'Walk to Candy Chrome and get your first job.',
+      vehicle: null,
+      inVehicle: false,
+      loyalty: { candy: 0, roxie: 0, eddie: 0, nina: 0 },
+      mission: {
+        active: null,
+        stage: 0,
+        complete: false
+      },
+      secrets: 0,
+      lastHint: 'Move with WASD / arrows. Tap E near a contact, car, or glowing hotspot.',
+      policeNoticeCooldown: 0
+    };
+
+    const ui = {
+      hudCash: document.getElementById('hud-cash'),
+      hudHeat: document.getElementById('hud-heat'),
+      hudDistrict: document.getElementById('hud-district'),
+      hudVehicle: document.getElementById('hud-vehicle'),
+      objective: document.getElementById('objective'),
+      actionHint: document.getElementById('action-hint'),
+      toast: document.getElementById('toast'),
+      dialogue: document.getElementById('dialogue'),
+      portrait: document.getElementById('portrait'),
+      dialogueName: document.getElementById('dialogue-name'),
+      dialogueRole: document.getElementById('dialogue-role'),
+      dialogueText: document.getElementById('dialogue-text'),
+      dialogueActions: document.getElementById('dialogue-actions'),
+      phone: document.getElementById('phone'),
+      phoneBody: document.getElementById('phone-body'),
+      pauseCard: document.getElementById('pause-card')
+    };
+
+    function updateHUD() {
+      ui.hudCash.textContent = `Cash: $${Math.floor(state.cash).toLocaleString()}`;
+      ui.hudHeat.textContent = `Heat: ${Array.from({ length: 5 }, (_, i) => i < state.heat ? '★' : '☆').join(' ')}`;
+      ui.hudDistrict.textContent = `District: ${state.district}`;
+      ui.hudVehicle.textContent = `Ride: ${state.vehicle ? state.vehicle.label : 'On Foot'}`;
+      ui.objective.textContent = `Objective: ${state.objective}`;
+      ui.actionHint.textContent = state.lastHint;
+    }
+
+    function toast(text) {
+      ui.toast.textContent = text;
+      ui.toast.classList.add('show');
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => ui.toast.classList.remove('show'), 1500);
+    }
+
+    function openDialogue(contact, text, actions) {
+      ui.portrait.src = contact.portrait;
+      ui.portrait.onerror = () => {
+        ui.portrait.style.display = 'none';
+      };
+      ui.portrait.onload = () => {
+        ui.portrait.style.display = 'block';
+      };
+      ui.dialogueName.textContent = contact.name;
+      ui.dialogueRole.textContent = contact.role;
+      ui.dialogueText.textContent = text;
+      ui.dialogueActions.innerHTML = '';
+      actions.forEach(action => {
+        const btn = document.createElement('button');
+        btn.className = `btn ${action.variant || ''}`.trim();
+        btn.textContent = action.label;
+        btn.onclick = () => {
+          closeDialogue();
+          action.onClick();
+        };
+        ui.dialogueActions.appendChild(btn);
+      });
+      ui.dialogue.classList.add('show');
+    }
+
+    function closeDialogue() {
+      ui.dialogue.classList.remove('show');
+    }
+
+    function openPhone() {
+      ui.phoneBody.innerHTML = '';
+      [CONTACTS.candy, CONTACTS.roxie, CONTACTS.eddie, CONTACTS.nina].forEach(contact => {
+        const row = document.createElement('div');
+        row.className = 'contact-row';
+        row.innerHTML = `
+          <img src="${contact.portrait}" alt="${contact.name}">
+          <div>
+            <div class="contact-name">${contact.name}</div>
+            <div class="contact-sub">${contact.role} • Loyalty ${state.loyalty[contact.key] || 0}</div>
+          </div>
+        `;
+        const btn = document.createElement('button');
+        btn.className = 'mini-btn';
+        btn.textContent = 'CALL';
+        btn.onclick = () => {
+          ui.phone.classList.remove('show');
+          simulatePhoneCall(contact.key);
+        };
+        row.appendChild(btn);
+        ui.phoneBody.appendChild(row);
+      });
+      ui.phone.classList.add('show');
+    }
+
+    function closePhone() {
+      ui.phone.classList.remove('show');
+    }
+
+    function openPauseCard(lines) {
+      document.getElementById('intel-line-1').textContent = lines[0] || '';
+      document.getElementById('intel-line-2').textContent = lines[1] || '';
+      document.getElementById('intel-line-3').textContent = lines[2] || '';
+      ui.pauseCard.classList.add('show');
+    }
+
+    function closePauseCard() {
+      ui.pauseCard.classList.remove('show');
+    }
+
+    function simulatePhoneCall(key) {
+      if (key === 'eddie') {
+        state.cash += 140;
+        state.loyalty.eddie += 1;
+        state.objective = 'Eddie says the marina is hot. Drive east and grab the money drop.';
+        state.lastHint = 'Look for the glowing cyan circle at the marina edge.';
+        toast('Static sold a hot lead.');
+      } else if (key === 'roxie') {
+        state.lastHint = CONTACTS.roxie.lines.gossip;
+        state.loyalty.roxie += 1;
+        toast('Roxie dropped gossip.');
+      } else if (key === 'candy') {
+        state.objective = 'Candy wants that envelope. Hit the club, then get back alive.';
+        state.loyalty.candy += 1;
+        toast('Candy moved the goalposts.');
+      } else if (key === 'nina') {
+        state.objective = 'Nina wants you at the marina once you get wheels.';
+        toast('Nina wants transport.');
+      }
+      updateHUD();
+    }
+
+    function policeMoment(scene, reason = 'trouble') {
+      if (state.policeNoticeCooldown > 0) return;
+      state.policeNoticeCooldown = 300;
+      const officer = state.heat >= 3 ? CONTACTS.nina : CONTACTS.eddie;
+      openDialogue(
+        {
+          name: state.heat >= 3 ? 'Sergeant Hammer Voss' : 'Officer Rick "Chrome" Dalton',
+          role: state.heat >= 3 ? 'SWAT' : 'Motorcycle cop',
+          portrait: state.heat >= 3 ? PORTRAITS.hammer : PORTRAITS.chrome
+        },
+        state.heat >= 3
+          ? `When I show up, your evening already went badly. This is about ${reason}.`
+          : `If I catch you again after ${reason}, I tow the car and your self-respect.`,
+        [
+          {
+            label: 'Run',
+            variant: 'secondary',
+            onClick: () => {
+              if (Math.random() < (state.inVehicle ? 0.62 : 0.38)) {
+                toast('You slipped the cops.');
+                state.heat = Math.max(0, state.heat - 1);
+              } else {
+                toast('You got clipped in traffic.');
+                state.heat = Math.min(5, state.heat + 1);
+              }
+              updateHUD();
+            }
+          },
+          {
+            label: 'Bribe',
+            variant: 'good',
+            onClick: () => {
+              const cost = 90 + state.heat * 55;
+              if (state.cash >= cost) {
+                state.cash -= cost;
+                state.heat = Math.max(0, state.heat - 2);
+                toast(`Paid ${cost}. Civic integrity worsens.`);
+              } else {
+                toast('You are too broke to be corrupt.');
+                state.heat = Math.min(5, state.heat + 1);
+              }
+              updateHUD();
+            }
+          }
+        ]
+      );
+    }
+
+    class BootScene extends Phaser.Scene {
+      constructor() {
+        super('BootScene');
+      }
+
+      create() {
+        this.scene.start('WorldScene');
+      }
+    }
+
+    class WorldScene extends Phaser.Scene {
+      constructor() {
+        super('WorldScene');
+      }
+
+      create() {
+        this.cameras.main.setBackgroundColor('#11051c');
+
+        this.worldWidth = 2200;
+        this.worldHeight = 1500;
+        this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
+        this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
+
+        this.makeCityBackdrop();
+        this.createZones();
+        this.createContacts();
+        this.createMissionHotspots();
+        this.createVehicle();
+        this.createPlayer();
+        this.createPolice();
+        this.createInput();
+        this.createLabels();
+        this.bindUI();
+
+        this.nearbyInteractable = null;
+        updateHUD();
+        toast('Vice Districts 2D loaded.');
+      }
+
+      makeCityBackdrop() {
+        const g = this.add.graphics();
+
+        // asphalt
+        g.fillStyle(0x271537, 1);
+        g.fillRect(0, 0, this.worldWidth, this.worldHeight);
+
+        // blocks
+        const blocks = [
+          { x: 120, y: 120, w: 420, h: 260, color: 0x3d1f52 },
+          { x: 700, y: 90, w: 340, h: 210, color: 0x4a205d },
+          { x: 1120, y: 120, w: 360, h: 300, color: 0x3a1d48 },
+          { x: 1580, y: 130, w: 420, h: 240, color: 0x4b235f },
+          { x: 180, y: 520, w: 300, h: 300, color: 0x3d2152 },
+          { x: 590, y: 470, w: 490, h: 340, color: 0x4a255e },
+          { x: 1180, y: 520, w: 300, h: 260, color: 0x341841 },
+          { x: 1600, y: 500, w: 330, h: 330, color: 0x442157 },
+          { x: 170, y: 970, w: 420, h: 260, color: 0x3d2254 },
+          { x: 760, y: 960, w: 340, h: 290, color: 0x4a2661 },
+          { x: 1220, y: 960, w: 420, h: 250, color: 0x371944 },
+          { x: 1710, y: 950, w: 260, h: 320, color: 0x422054 }
+        ];
+
+        blocks.forEach(b => {
+          g.fillStyle(b.color, 1);
+          g.fillRoundedRect(b.x, b.y, b.w, b.h, 18);
+          g.lineStyle(2, 0x6c3ca0, 0.45);
+          g.strokeRoundedRect(b.x, b.y, b.w, b.h, 18);
+        });
+
+        // roads
+        g.fillStyle(0x1b1027, 1);
+        g.fillRect(0, 410, this.worldWidth, 80);
+        g.fillRect(0, 860, this.worldWidth, 88);
+        g.fillRect(560, 0, 88, this.worldHeight);
+        g.fillRect(1500, 0, 88, this.worldHeight);
+
+        // lane lines
+        g.lineStyle(4, 0xffd166, 0.5);
+        [450, 900].forEach(y => {
+          for (let x = 0; x < this.worldWidth; x += 90) {
+            g.lineBetween(x, y, x + 36, y);
+          }
+        });
+        [604, 1544].forEach(x => {
+          for (let y = 0; y < this.worldHeight; y += 90) {
+            g.lineBetween(x, y, x, y + 36);
+          }
+        });
+
+        // water / marina edge
+        g.fillStyle(0x0e3352, 1);
+        g.fillRect(0, 1300, this.worldWidth, 200);
+        g.lineStyle(4, 0x5ef2ff, 0.5);
+        g.lineBetween(0, 1298, this.worldWidth, 1298);
+
+        // palm hints / neon dots
+        for (let i = 0; i < 18; i++) {
+          const x = 100 + i * 110;
+          g.fillStyle(0x0b6d45, 1);
+          g.fillCircle(x, 70 + (i % 2) * 18, 12);
+          g.fillStyle(0x5ef2ff, 0.35);
+          g.fillCircle(x + 20, 82, 4);
+        }
+
+        // district overlays
+        this.add.rectangle(390, 260, 480, 300, 0xff4db8, 0.05).setBlendMode(Phaser.BlendModes.ADD);
+        this.add.rectangle(905, 210, 380, 240, 0x5ef2ff, 0.05).setBlendMode(Phaser.BlendModes.ADD);
+        this.add.rectangle(1310, 255, 430, 330, 0xb9ff66, 0.04).setBlendMode(Phaser.BlendModes.ADD);
+        this.add.rectangle(1660, 650, 500, 420, 0xffd166, 0.04).setBlendMode(Phaser.BlendModes.ADD);
+      }
+
+      createZones() {
+        this.zones = [
+          { name: 'Sunset Strip', rect: new Phaser.Geom.Rectangle(50, 50, 520, 360) },
+          { name: 'Marina Glitz', rect: new Phaser.Geom.Rectangle(640, 50, 460, 320) },
+          { name: 'Vice Heights', rect: new Phaser.Geom.Rectangle(1110, 50, 430, 390) },
+          { name: 'Dockside', rect: new Phaser.Geom.Rectangle(1530, 420, 520, 430) },
+          { name: 'Cypress Flats', rect: new Phaser.Geom.Rectangle(1450, 900, 560, 360) }
+        ];
+      }
+
+      createLabels() {
+        const style = { fontFamily: 'Consolas, monospace', fontSize: '22px', color: '#ffeefc' };
+        this.add.text(180, 90, 'SUNSET STRIP', style).setAlpha(0.72);
+        this.add.text(720, 70, 'MARINA GLITZ', style).setAlpha(0.72);
+        this.add.text(1170, 90, 'VICE HEIGHTS', style).setAlpha(0.72);
+        this.add.text(1640, 450, 'DOCKSIDE', style).setAlpha(0.72);
+        this.add.text(1510, 920, 'CYPRESS FLATS', style).setAlpha(0.72);
+        this.add.text(60, 1320, 'ATLANTIC WATER', { ...style, fontSize: '18px', color: '#5ef2ff' }).setAlpha(0.72);
+      }
+
+      createPlayer() {
+        this.player = this.add.container(250, 260);
+        const body = this.add.rectangle(0, 0, 28, 28, 0xff8d66);
+        const shirt = this.add.rectangle(0, 2, 24, 14, 0xff8a3d);
+        const shirtStripe = this.add.rectangle(0, 2, 24, 4, 0x3cb8ff);
+        const head = this.add.circle(0, -14, 10, 0xe9ba8e);
+        const hair = this.add.rectangle(0, -20, 16, 6, 0x3a2018);
+        const legs = this.add.rectangle(0, 14, 18, 10, 0x3259a8);
+        this.player.add([body, shirt, shirtStripe, head, hair, legs]);
+
+        this.physics.add.existing(this.player);
+        this.player.body.setSize(22, 22);
+        this.player.body.setOffset(-11, -11);
+        this.player.body.setCollideWorldBounds(true);
+        this.cameras.main.startFollow(this.player, true, 0.09, 0.09);
+      }
+
+      createVehicle() {
+        this.car = this.add.container(760, 230);
+        const shell = this.add.rectangle(0, 0, 76, 38, 0xd94d4d).setStrokeStyle(2, 0xffffff, 0.18);
+        const roof = this.add.rectangle(0, 0, 44, 22, 0xf59fb3);
+        const glass = this.add.rectangle(0, 0, 28, 12, 0x6be8ff, 0.8);
+        const w1 = this.add.circle(-24, -18, 8, 0x111111);
+        const w2 = this.add.circle(24, -18, 8, 0x111111);
+        const w3 = this.add.circle(-24, 18, 8, 0x111111);
+        const w4 = this.add.circle(24, 18, 8, 0x111111);
+        this.car.add([w1, w2, w3, w4, shell, roof, glass]);
+
+        this.physics.add.existing(this.car);
+        this.car.body.setSize(70, 32);
+        this.car.body.setCollideWorldBounds(true);
+        this.car.setData('type', 'vehicle');
+        this.car.setData('label', 'Vice Muscle');
+        this.car.setData('speed', 250);
+      }
+
+      createContacts() {
+        this.contacts = [];
+        this.contacts.push(this.makeContact(365, 250, 0xff4db8, 'Candy Chrome', 'candy'));
+        this.contacts.push(this.makeContact(500, 335, 0xffd166, 'Roxie Del Mar', 'roxie'));
+        this.contacts.push(this.makeContact(935, 210, 0x5ef2ff, 'Eddie Static Vega', 'eddie'));
+        this.contacts.push(this.makeContact(930, 1290, 0xff8cc6, 'Nina Velez', 'nina'));
+      }
+
+      makeContact(x, y, color, label, key) {
+        const c = this.add.container(x, y);
+        const aura = this.add.circle(0, 0, 22, color, 0.16).setBlendMode(Phaser.BlendModes.ADD);
+        const body = this.add.rectangle(0, 0, 18, 30, color);
+        const head = this.add.circle(0, -20, 9, 0xf0c49a);
+        const name = this.add.text(-46, 30, label.toUpperCase(), {
+          fontFamily: 'Consolas, monospace',
+          fontSize: '11px',
+          color: '#ffeefc'
+        }).setAlpha(0.9);
+        c.add([aura, body, head, name]);
+        this.physics.add.existing(c);
+        c.body.setSize(24, 42);
+        c.body.setImmovable(true);
+        c.setData('type', 'contact');
+        c.setData('contactKey', key);
+        return c;
+      }
+
+      createMissionHotspots() {
+        this.hotspots = [];
+        const envelope = this.add.circle(460, 580, 16, 0xff4db8, 0.8).setStrokeStyle(2, 0xffffff, 0.25);
+        this.tweens.add({ targets: envelope, alpha: 0.35, yoyo: true, repeat: -1, duration: 700 });
+        this.physics.add.existing(envelope);
+        envelope.body.setCircle(16);
+        envelope.body.setOffset(-16, -16);
+        envelope.setData('type', 'hotspot');
+        envelope.setData('hotspotKey', 'club-envelope');
+        this.hotspots.push(envelope);
+
+        const marinaDrop = this.add.circle(1040, 1320, 16, 0x5ef2ff, 0.85).setStrokeStyle(2, 0xffffff, 0.25);
+        this.tweens.add({ targets: marinaDrop, scale: 1.18, yoyo: true, repeat: -1, duration: 600 });
+        this.physics.add.existing(marinaDrop);
+        marinaDrop.body.setCircle(16);
+        marinaDrop.body.setOffset(-16, -16);
+        marinaDrop.setData('type', 'hotspot');
+        marinaDrop.setData('hotspotKey', 'marina-cash');
+        this.hotspots.push(marinaDrop);
+      }
+
+      createPolice() {
+        this.police = this.add.container(1730, 1110);
+        const body = this.add.rectangle(0, 0, 66, 34, 0xf7f7f7).setStrokeStyle(2, 0x7aa8ff, 0.35);
+        const stripe = this.add.rectangle(0, 0, 66, 6, 0x2d59c9);
+        const light = this.add.rectangle(0, -10, 28, 6, 0xff5d73);
+        const w1 = this.add.circle(-22, -16, 8, 0x111111);
+        const w2 = this.add.circle(22, -16, 8, 0x111111);
+        const w3 = this.add.circle(-22, 16, 8, 0x111111);
+        const w4 = this.add.circle(22, 16, 8, 0x111111);
+        this.police.add([w1, w2, w3, w4, body, stripe, light]);
+        this.physics.add.existing(this.police);
+        this.police.body.setSize(60, 28);
+      }
+
+      createInput() {
+        this.keys = this.input.keyboard.addKeys({
+          up: Phaser.Input.Keyboard.KeyCodes.W,
+          down: Phaser.Input.Keyboard.KeyCodes.S,
+          left: Phaser.Input.Keyboard.KeyCodes.A,
+          right: Phaser.Input.Keyboard.KeyCodes.D,
+          up2: Phaser.Input.Keyboard.KeyCodes.UP,
+          down2: Phaser.Input.Keyboard.KeyCodes.DOWN,
+          left2: Phaser.Input.Keyboard.KeyCodes.LEFT,
+          right2: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+          action: Phaser.Input.Keyboard.KeyCodes.E,
+          phone: Phaser.Input.Keyboard.KeyCodes.Q,
+          info: Phaser.Input.Keyboard.KeyCodes.TAB,
+          exit: Phaser.Input.Keyboard.KeyCodes.F
+        });
+
+        this.input.keyboard.on('keydown-E', () => this.handleAction());
+        this.input.keyboard.on('keydown-Q', () => {
+          if (ui.phone.classList.contains('show')) closePhone();
+          else openPhone();
+        });
+        this.input.keyboard.on('keydown-TAB', event => {
+          event.preventDefault();
+          if (ui.pauseCard.classList.contains('show')) closePauseCard();
+          else this.openIntel();
+        });
+        this.input.keyboard.on('keydown-F', () => this.tryExitVehicle());
+
+        this.touchState = { x: 0, y: 0 };
+        this.bindTouchControls();
+      }
+
+      bindTouchControls() {
+        const stick = document.getElementById('stick');
+        const knob = document.getElementById('knob');
+        let dragging = false;
+
+        const updateStick = client => {
+          const rect = stick.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const dx = client.clientX - cx;
+          const dy = client.clientY - cy;
+          const dist = Math.min(Math.hypot(dx, dy), 38);
+          const angle = Math.atan2(dy, dx);
+          const x = Math.cos(angle) * dist;
+          const y = Math.sin(angle) * dist;
+          knob.style.left = `${39 + x}px`;
+          knob.style.top = `${39 + y}px`;
+          this.touchState.x = x / 38;
+          this.touchState.y = y / 38;
+        };
+
+        const resetStick = () => {
+          dragging = false;
+          knob.style.left = '39px';
+          knob.style.top = '39px';
+          this.touchState.x = 0;
+          this.touchState.y = 0;
+        };
+
+        stick.addEventListener('pointerdown', e => {
+          dragging = true;
+          updateStick(e);
+        });
+        window.addEventListener('pointermove', e => {
+          if (!dragging) return;
+          updateStick(e);
+        });
+        window.addEventListener('pointerup', resetStick);
+        window.addEventListener('pointercancel', resetStick);
+
+        document.getElementById('touch-action').onclick = () => this.handleAction();
+        document.getElementById('touch-phone').onclick = () => {
+          if (ui.phone.classList.contains('show')) closePhone();
+          else openPhone();
+        };
+        document.getElementById('touch-map').onclick = () => {
+          if (ui.pauseCard.classList.contains('show')) closePauseCard();
+          else this.openIntel();
+        };
+        document.getElementById('touch-exit').onclick = () => this.tryExitVehicle();
+      }
+
+      bindUI() {
+        document.getElementById('btn-phone').onclick = () => {
+          closePauseCard();
+          if (ui.phone.classList.contains('show')) closePhone();
+          else openPhone();
+        };
+        document.getElementById('btn-close-pause').onclick = closePauseCard;
+      }
+
+      openIntel() {
+        openPauseCard([
+          `Rival concept for next build: citywide control and rival crews are coming.`,
+          `Current mission: ${state.mission.active || 'None'}`,
+          `Secrets discovered: ${state.secrets} • Loyalty: Candy ${state.loyalty.candy}, Eddie ${state.loyalty.eddie}`
+        ]);
+      }
+
+      update() {
+        if (state.policeNoticeCooldown > 0) state.policeNoticeCooldown -= 1;
+
+        if (ui.dialogue.classList.contains('show') || ui.phone.classList.contains('show') || ui.pauseCard.classList.contains('show')) {
+          this.setVelocity(0, 0);
+          return;
+        }
+
+        let moveX = 0;
+        let moveY = 0;
+
+        const kbLeft = this.keys.left.isDown || this.keys.left2.isDown;
+        const kbRight = this.keys.right.isDown || this.keys.right2.isDown;
+        const kbUp = this.keys.up.isDown || this.keys.up2.isDown;
+        const kbDown = this.keys.down.isDown || this.keys.down2.isDown;
+
+        if (kbLeft) moveX -= 1;
+        if (kbRight) moveX += 1;
+        if (kbUp) moveY -= 1;
+        if (kbDown) moveY += 1;
+
+        moveX += this.touchState.x;
+        moveY += this.touchState.y;
+
+        const len = Math.hypot(moveX, moveY) || 1;
+        moveX /= len;
+        moveY /= len;
+
+        const speed = state.inVehicle ? 250 : 150;
+        this.setVelocity(moveX * speed, moveY * speed);
+
+        if (state.inVehicle) {
+          this.car.rotation = Phaser.Math.Angle.Between(0, 0, moveX, moveY);
+        }
+
+        this.updateDistrict();
+        this.updateNearbyHint();
+        this.updatePolice();
+      }
+
+      setVelocity(vx, vy) {
+        if (state.inVehicle) {
+          this.car.body.setVelocity(vx, vy);
+          this.player.x = this.car.x;
+          this.player.y = this.car.y;
+        } else {
+          this.player.body.setVelocity(vx, vy);
+        }
+      }
+
+      updateDistrict() {
+        const target = state.inVehicle ? this.car : this.player;
+        const point = new Phaser.Geom.Point(target.x, target.y);
+        for (const zone of this.zones) {
+          if (Phaser.Geom.Rectangle.ContainsPoint(zone.rect, point)) {
+            if (state.district !== zone.name) {
+              state.district = zone.name;
+              toast(`Entered ${zone.name}`);
+              updateHUD();
+            }
+            return;
+          }
+        }
+      }
+
+      updateNearbyHint() {
+        const target = state.inVehicle ? this.car : this.player;
+        let nearest = null;
+        let bestDist = 99999;
+
+        const all = [...this.contacts, this.car, ...this.hotspots];
+        all.forEach(obj => {
+          if (state.inVehicle && obj === this.car) return;
+          const d = Phaser.Math.Distance.Between(target.x, target.y, obj.x, obj.y);
+          if (d < bestDist && d < 74) {
+            bestDist = d;
+            nearest = obj;
+          }
+        });
+
+        this.nearbyInteractable = nearest;
+
+        if (!nearest) {
+          state.lastHint = state.inVehicle
+            ? 'Drive with WASD / arrows. Tap F near an open road to step out. Q opens contacts.'
+            : 'Move with WASD / arrows. Tap E near a contact, car, or glowing hotspot.';
+        } else if (nearest.getData('type') === 'contact') {
+          state.lastHint = `Tap E to talk to ${nearest.getData('contactKey').toUpperCase().replace('_', ' ')}`;
+        } else if (nearest.getData('type') === 'vehicle') {
+          state.lastHint = 'Tap E to get in the car.';
+        } else if (nearest.getData('type') === 'hotspot') {
+          state.lastHint = 'Tap E to trigger the hotspot.';
+        }
+        updateHUD();
+      }
+
+      updatePolice() {
+        if (state.heat <= 0) {
+          this.police.body.setVelocity(0, 0);
+          return;
+        }
+        const target = state.inVehicle ? this.car : this.player;
+        const speed = 80 + state.heat * 30;
+        this.physics.moveToObject(this.police, target, speed);
+        const dist = Phaser.Math.Distance.Between(this.police.x, this.police.y, target.x, target.y);
+        if (dist < 110 && Math.random() < 0.008 * state.heat) {
+          policeMoment(this, 'ongoing heat');
+        }
+      }
+
+      tryExitVehicle() {
+        if (!state.inVehicle) return;
+        state.inVehicle = false;
+        this.player.setVisible(true);
+        this.player.x = this.car.x + 34;
+        this.player.y = this.car.y + 10;
+        this.player.body.enable = true;
+        this.car.body.setVelocity(0, 0);
+        state.lastHint = 'You stepped out. Tap E to get back in if you miss your bad decisions.';
+        updateHUD();
+        toast('Exited vehicle.');
+      }
+
+      handleAction() {
+        if (ui.dialogue.classList.contains('show') || ui.phone.classList.contains('show') || ui.pauseCard.classList.contains('show')) return;
+        const obj = this.nearbyInteractable;
+        if (!obj) return;
+
+        const type = obj.getData('type');
+        if (type === 'vehicle') {
+          state.inVehicle = true;
+          this.car.x = this.player.x;
+          this.car.y = this.player.y;
+          state.vehicle = { label: this.car.getData('label') };
+          this.player.setVisible(false);
+          this.player.body.enable = false;
+          toast('You stole the Vice Muscle.');
+          updateHUD();
+          return;
+        }
+
+        if (type === 'contact') {
+          this.interactWithContact(obj.getData('contactKey'));
+          return;
+        }
+
+        if (type === 'hotspot') {
+          this.triggerHotspot(obj.getData('hotspotKey'), obj);
+        }
+      }
+
+      interactWithContact(key) {
+        if (key === 'candy') {
+          const contact = CONTACTS.candy;
+          if (!state.mission.active) {
+            openDialogue(contact, contact.lines.intro, [
+              {
+                label: 'Take the envelope job',
+                variant: 'good',
+                onClick: () => {
+                  state.mission.active = 'Recover the Envelope';
+                  state.mission.stage = 1;
+                  state.objective = 'Go to the club hotspot and grab the envelope.';
+                  state.lastHint = 'The pink hotspot west of the main road is now live.';
+                  state.loyalty.candy += 1;
+                  updateHUD();
+                  toast('Candy hired you.');
+                }
+              },
+              {
+                label: 'Not now',
+                variant: 'dark',
+                onClick: () => toast('Candy judges your ambition.')
+              }
+            ]);
+          } else if (state.mission.active === 'Recover the Envelope' && state.mission.complete) {
+            openDialogue(contact, contact.lines.complete, [
+              {
+                label: 'Get paid',
+                variant: 'good',
+                onClick: () => {
+                  state.cash += 1250;
+                  state.mission.active = null;
+                  state.mission.complete = false;
+                  state.objective = 'Call Eddie or Roxie for your next move.';
+                  state.lastHint = 'Use Q or the CALL button to open VicePhone.';
+                  state.loyalty.candy += 2;
+                  toast('Candy paid you $1,250.');
+                  updateHUD();
+                }
+              }
+            ]);
+          } else {
+            openDialogue(contact, contact.lines.mission, [{ label: 'Understood', variant: 'secondary', onClick: () => {} }]);
+          }
+        }
+
+        if (key === 'roxie') {
+          openDialogue(CONTACTS.roxie, CONTACTS.roxie.lines.intro, [
+            {
+              label: 'Buy gossip ($90)',
+              variant: 'good',
+              onClick: () => {
+                if (state.cash < 90) {
+                  toast('Roxie does not finance rumors.');
+                  return;
+                }
+                state.cash -= 90;
+                state.loyalty.roxie += 1;
+                state.lastHint = CONTACTS.roxie.lines.gossip;
+                toast('Roxie sold gossip.');
+                updateHUD();
+              }
+            },
+            {
+              label: 'After-hours ride ($180)',
+              variant: 'warn',
+              onClick: async () => {
+                if (state.cash < 180) {
+                  toast('Roxie is not running a charity.');
+                  return;
+                }
+                state.cash -= 180;
+                updateHUD();
+                await this.playEscortScene('Roxie Del Mar', '🚗');
+                const r = Math.random();
+                if (r < 0.33) {
+                  state.heat = Math.max(0, state.heat - 1);
+                  toast('You emerged calmer and slightly less arrestable.');
+                } else if (r < 0.66) {
+                  state.cash += 110;
+                  toast('Roxie handed you a useful lead.');
+                } else {
+                  state.heat = Math.min(5, state.heat + 1);
+                  toast('A patrol noticed the suspension.');
+                  policeMoment(this, 'a very parked bad decision');
+                }
+                updateHUD();
+              }
+            }
+          ]);
+        }
+
+        if (key === 'eddie') {
+          openDialogue(CONTACTS.eddie, CONTACTS.eddie.lines.intro, [
+            {
+              label: 'Buy hot tip ($110)',
+              variant: 'good',
+              onClick: () => {
+                if (state.cash < 110) {
+                  toast('Static hangs up on poor people.');
+                  return;
+                }
+                state.cash -= 110;
+                state.loyalty.eddie += 1;
+                state.cash += 180;
+                state.objective = 'Eddie says the marina cash drop is live. Head south-east.';
+                state.lastHint = 'The cyan hotspot at the waterline is glowing for a reason.';
+                toast('Static sold a hot lead.');
+                updateHUD();
+              }
+            },
+            {
+              label: 'Ask what he knows',
+              variant: 'secondary',
+              onClick: () => {
+                state.lastHint = CONTACTS.eddie.lines.tip;
+                updateHUD();
+                toast('Static offered color commentary.');
+              }
+            }
+          ]);
+        }
+
+        if (key === 'nina') {
+          openDialogue(CONTACTS.nina, CONTACTS.nina.lines.intro, [
+            {
+              label: 'Need work',
+              variant: 'good',
+              onClick: () => {
+                if (!state.inVehicle && !state.vehicle) {
+                  state.lastHint = 'Nina wants you mobile. Steal a ride first.';
+                  updateHUD();
+                  toast('Nina wants transport.');
+                  return;
+                }
+                state.cash += 260;
+                state.loyalty.nina += 1;
+                toast('Nina paid a scouting fee.');
+                updateHUD();
+              }
+            }
+          ]);
+        }
+      }
+
+      async playEscortScene(name, icon) {
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.inset = '0';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.background = 'rgba(0,0,0,0.82)';
+        overlay.style.zIndex = '80';
+        overlay.innerHTML = `
+          <div style="width:min(560px,calc(100vw - 24px));padding:18px;text-align:center;background:linear-gradient(180deg,rgba(42,18,66,.98),rgba(20,8,34,.98));border:1px solid rgba(127,60,183,.95);border-radius:18px;box-shadow:0 10px 28px rgba(0,0,0,.35)">
+            <div style="font-size:24px;font-weight:900;letter-spacing:.08em;text-transform:uppercase">${name}</div>
+            <div style="margin-top:10px;color:#d4a8cf">The city pretends not to notice.</div>
+            <div id="escort-car" style="font-size:84px;display:inline-block;margin-top:16px">${icon}</div>
+            <div style="margin-top:14px;font-size:18px;font-weight:800;color:#ffd166">THE CAR ROCKS LIKE A BAD DECISION</div>
+            <div style="height:10px;border-radius:999px;margin-top:14px;background:linear-gradient(90deg,#ff4db8,#5ef2ff,#ff4db8);background-size:200% 100%"></div>
+          </div>
+        `;
+        document.body.appendChild(overlay);
+        const car = overlay.querySelector('#escort-car');
+        const start = performance.now();
+        function shake(now) {
+          const t = (now - start) / 90;
+          car.style.transform = `translate(${Math.sin(t*1.9)*3}px, ${Math.cos(t*2.1)*2}px)`;
+          if (now - start < 3000) requestAnimationFrame(shake);
+        }
+        requestAnimationFrame(shake);
+        await new Promise(r => setTimeout(r, 3000));
+        overlay.remove();
+      }
+
+      triggerHotspot(key, obj) {
+        if (key === 'club-envelope') {
+          if (state.mission.active !== 'Recover the Envelope' || state.mission.stage !== 1) {
+            toast('A very interesting place, but no reason to be here yet.');
+            return;
+          }
+          state.mission.stage = 2;
+          state.mission.complete = true;
+          state.cash += 220;
+          state.heat = Math.min(5, state.heat + 1);
+          state.objective = 'Get back to Candy Chrome for the payout.';
+          state.lastHint = 'Head back north-west. Candy will either pay you or insult you first.';
+          obj.destroy();
+          toast('Envelope grabbed. Heat up.');
+          updateHUD();
+          policeMoment(this, 'lifting a nightclub envelope');
+          return;
+        }
+
+        if (key === 'marina-cash') {
+          state.cash += 360;
+          state.secrets += 1;
+          state.heat = Math.min(5, state.heat + (Math.random() < 0.5 ? 1 : 0));
+          state.objective = 'You found a marina drop. Call Eddie or keep pushing luck.';
+          state.lastHint = 'This city rewards greed right up until it doesn’t.';
+          obj.setAlpha(0.25);
+          toast('Marina cash secured.');
+          updateHUD();
+          if (state.heat > 0 && Math.random() < 0.5) {
+            policeMoment(this, 'a marina cash pickup');
+          }
+        }
+      }
+    }
+
+    const game = new Phaser.Game({
+      type: Phaser.AUTO,
+      parent: 'phaser-root',
+      backgroundColor: '#090212',
+      scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: window.innerWidth,
+        height: window.innerHeight - 112
+      },
+      physics: {
+        default: 'arcade',
+        arcade: {
+          debug: false
+        }
+      },
+      scene: [BootScene, WorldScene]
+    });
+
+    updateHUD();
+  </script>
+</body>
+</html>
